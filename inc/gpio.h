@@ -95,6 +95,11 @@ extern void gpio_pins_write_output_offset(const gpio_t* pins, uint32_t data);
 #define PCA_RST_PIN_N 31
 #define PCA_RST_PIN_MASK (uint32_t)(0b1<<PCA_RST_PIN_N)
 
+//Направление RS485
+#define RS485_DIR_PIN_PORT NRF_P1
+#define RS485_DIR_PIN_N 2
+#define RS485_DIR_PIN_MASK (uint32_t)(0b1<<RS485_DIR_PIN_N)
+
 //============================================
 
 //Вкл 3.3в
@@ -123,6 +128,13 @@ static const gpio_t pca_rst_pin = {
 		.port = PCA_RST_PIN_PORT,
 		.shift = PCA_RST_PIN_N,
 		.mask = PCA_RST_PIN_MASK
+};
+
+//Направление RS485
+static const gpio_t rs485_dir_pin = {
+		.port = RS485_DIR_PIN_PORT,
+		.shift = RS485_DIR_PIN_N,
+		.mask = RS485_DIR_PIN_MASK
 };
 
 extern void gpio_init();

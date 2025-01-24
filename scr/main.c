@@ -12,7 +12,9 @@
 #include <lcd44780.h>
 #include <delay.h>
 #include <nrfx_twim.h>
+#include <nrfx_uarte.h>
 #include "gpio.h"
+#include "nmbs_port.h"
 
 lcd44780_t scr_lcd44780;
 
@@ -83,28 +85,143 @@ void UICR_init() {
 	}
 }
 
-nrfx_twim_t nrf_twim = {
-		.p_twim = NRF_TWIM0,
-		.drv_inst_idx = 0
+//uart begin
+void rs485_set_rx(void) {
+	gpio_pins_clr_output(&rs485_dir_pin);
+}
+
+void rs485_set_tx(void) {
+	gpio_pins_set_output(&rs485_dir_pin);
+}
+
+nrfx_uarte_t nrf_uarte = NRFX_UARTE_INSTANCE(0);
+
+nrfx_uarte_config_t uarte_config = {
+		.pseltxd = ((uint32_t)((11 << 0) | (1 << 5) | (0 << 31))), //P1.11 TXD
+		.pselrxd = ((uint32_t)((28 << 0) | (0 << 5) | (0 << 31))), //P0.28 RXD
+		.pselcts = NRF_UARTE_PSEL_DISCONNECTED,
+		.pselrts = NRF_UARTE_PSEL_DISCONNECTED,
+		.p_context = NULL,
+		.hwfc = NRF_UARTE_HWFC_DISABLED,
+		.parity = NRF_UARTE_PARITY_EXCLUDED,
+		.baudrate = NRF_UARTE_BAUDRATE_9600,
+		.interrupt_priority = 1,
 };
 
-const nrfx_twim_config_t twi_config = {
-		.scl = ((uint32_t)((17 << 0) | (0 << 5) | (0 << 31))),
-		.sda = ((uint32_t)((15 << 0) | (0 << 5) | (0 << 31))),
+void uarte_tx_done_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
+	rs485_set_rx();
+}
+
+void uarte_rx_done_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
+
+}
+
+void uarte_error_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
+	uint32_t error_mask = p_event->data.error.error_mask;
+
+	if(error_mask & NRF_UARTE_ERROR_OVERRUN_MASK) {
+
+	}
+
+	if(error_mask & NRF_UARTE_ERROR_PARITY_MASK) {
+
+	}
+
+	if(error_mask & NRF_UARTE_ERROR_FRAMING_MASK) {
+
+	}
+
+	if(error_mask & NRF_UARTE_ERROR_BREAK_MASK) {
+
+	}
+}
+
+void uarte_event_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
+	switch(p_event->type) {
+	case NRFX_UARTE_EVT_TX_DONE:
+		uarte_tx_done_handler(p_event, p_context);
+		break;
+	case NRFX_UARTE_EVT_RX_DONE:
+		uarte_rx_done_handler(p_event, p_context);
+		break;
+	case NRFX_UARTE_EVT_ERROR:
+		uarte_error_handler(p_event, p_context);
+		break;
+	default:
+		break;
+	}
+}
+
+void uarte_init(void) {
+	//P1.02 DIR: Output, Connect, Pull down, S0S1, Disabled
+	NRF_P1->PIN_CNF[2] = (uint32_t)((1 << 0) | (0 << 1) | (1 << 2) | (0 << 8) | (0 << 16));
+	//P1.11 TXD: Output, Connect, Pull up, S0S1, Disabled
+	NRF_P1->PIN_CNF[11] = (uint32_t)((1 << 0) | (0 << 1) | (3 << 2) | (0 << 8) | (0 << 16));
+	//P0.28 RXD: Input, Connect, Pull up, S0S1, Disabled
+	NRF_P0->PIN_CNF[28] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (0 << 8) | (0 << 16));
+
+	nrfx_uarte_init(&nrf_uarte,&uarte_config, uarte_event_handler);
+}
+//uart end
+
+//nanomodbus begin
+nmbs_t nmbs;
+
+static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
+    return 0;
+}
+static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
+	rs485_set_tx();
+	nrfx_uarte_tx(&nrf_uarte, buf, count);
+	return 0;
+}
+
+nmbs_error nmbs_client_init(nmbs_t* nmbs) {
+    nmbs_platform_conf conf;
+
+    nmbs_platform_conf_create(&conf);
+
+    conf.transport = NMBS_TRANSPORT_RTU;
+    conf.read = read_serial;
+    conf.write = write_serial;
+
+    nmbs_error status = nmbs_client_create(nmbs, &conf);
+    if (status != NMBS_ERROR_NONE) {
+        return status;
+    }
+
+    nmbs_set_byte_timeout(nmbs, 100);
+    nmbs_set_read_timeout(nmbs, 1000);
+
+    return NMBS_ERROR_NONE;
+}
+
+void modbus_init(void) {
+	nmbs_client_init(&nmbs);
+}
+//nanomodbus end
+
+//i2c begin
+nrfx_twim_t nrf_twim = NRFX_TWIM_INSTANCE(0);
+
+const nrfx_twim_config_t twim_config = {
+		.scl = ((uint32_t)((17 << 0) | (0 << 5) | (0 << 31))), //P0.17 SCL
+		.sda = ((uint32_t)((15 << 0) | (0 << 5) | (0 << 31))), //P0.15 SDA
 		.frequency = 0x01980000,
 		.interrupt_priority = 1,
 		.hold_bus_uninit = false
 };
 
 void twim_init(void) {
-	//P0.17 SCL
-	//P0.15 SDA
-	NRF_P0->PIN_CNF[17] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (6 << 8)); //Input, Connect, Pullup, S0D1
-	NRF_P0->PIN_CNF[15] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (6 << 8)); //Input, Connect, Pullup, S0D1
+	//P0.17 SCL: Input, Connect, Pull up, S0D1, Disabled
+	NRF_P0->PIN_CNF[17] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (6 << 8) | (0 << 16));
+	//P0.15 SDA: Input, Connect, Pull up, S0D1, Disabled
+	NRF_P0->PIN_CNF[15] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (6 << 8) | (0 << 16));
 
-	nrfx_twim_init(&nrf_twim, &twi_config, NULL, NULL);
+	nrfx_twim_init(&nrf_twim, &twim_config, NULL, NULL);
 	nrfx_twim_enable(&nrf_twim);
 }
+//i2c end
 
 typedef struct {
 	uint8_t cmd;
