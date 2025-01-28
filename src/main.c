@@ -13,6 +13,7 @@
 #include <delay.h>
 #include "nrfx_twim.h"
 #include "nrfx_uarte.h"
+#include "nrfx_timer.h"
 #include "gpio.h"
 #include "nanomodbus.h"
 
@@ -132,7 +133,7 @@ nrfx_uarte_config_t uarte_config = {
 		.hwfc = NRF_UARTE_HWFC_DISABLED,
 		.parity = NRF_UARTE_PARITY_EXCLUDED,
 		.baudrate = NRF_UARTE_BAUDRATE_9600,
-		.interrupt_priority = 1,
+		.interrupt_priority = 2,
 };
 
 void uarte_tx_done_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
@@ -175,7 +176,7 @@ void uarte_error_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
 	uarte->rx.done = true;
 }
 
-void uarte_event_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
+void uarte_0_event_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
 	switch(p_event->type) {
 	case NRFX_UARTE_EVT_TX_DONE:
 		uarte_tx_done_handler(p_event, p_context);
@@ -193,7 +194,7 @@ void uarte_event_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
 	}
 }
 
-void uarte_init(void) {
+void uarte_0_init(void) {
 	//P1.02 DIR: Output, Connect, Pull down, S0S1, Disabled
 	NRF_P1->PIN_CNF[2] = (uint32_t)((1 << 0) | (0 << 1) | (1 << 2) | (0 << 8) | (0 << 16));
 	//P1.11 TXD: Output, Connect, Pull up, S0S1, Disabled
@@ -201,9 +202,58 @@ void uarte_init(void) {
 	//P0.28 RXD: Input, Connect, Pull up, S0S1, Disabled
 	NRF_P0->PIN_CNF[28] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (0 << 8) | (0 << 16));
 
-	nrfx_uarte_init(&nrf_uarte.uarte,&uarte_config, uarte_event_handler);
+	nrfx_uarte_init(&nrf_uarte.uarte,&uarte_config, uarte_0_event_handler);
 }
 //uart end
+
+//timer begin
+nrfx_timer_t timer_0 = NRFX_TIMER_INSTANCE(0);
+
+nrfx_timer_config_t timer_0_config = {
+		.frequency = NRF_TIMER_FREQ_250kHz,
+		.mode = NRF_TIMER_MODE_TIMER,
+		.bit_width = NRF_TIMER_BIT_WIDTH_32,
+		.interrupt_priority = 1,
+		.p_context = &nrf_uarte
+};
+
+void nrfx_uart_rx_timeout_handler(void *p_context) {
+	uarte_t* uarte = (uarte_t*)p_context;
+
+	uarte->rx.timeout = true;
+
+	nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL0);
+	nrfx_timer_disable(&timer_0);
+}
+
+void nrfx_uart_tx_timeout_handler(void *p_context) {
+	uarte_t* uarte = (uarte_t*)p_context;
+
+	uarte->tx.timeout = true;
+
+	nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL1);
+	nrfx_timer_disable(&timer_0);
+}
+
+void nrfx_timer_0_event_handler(nrf_timer_event_t event_type, void *p_context) {
+	switch(event_type) {
+	case NRF_TIMER_EVENT_COMPARE0:
+		nrfx_uart_rx_timeout_handler(p_context);
+		break;
+	case NRF_TIMER_EVENT_COMPARE1:
+		nrfx_uart_tx_timeout_handler(p_context);
+		break;
+	default:
+		nrfx_timer_disable(&timer_0);
+		nrfx_timer_clear(&timer_0);
+		break;
+	}
+}
+
+void timer_0_init(void) {
+	nrfx_timer_init(&timer_0, &timer_0_config, nrfx_timer_0_event_handler);
+}
+//timer end
 
 //nanomodbus begin
 nmbs_t nmbs;
@@ -211,32 +261,37 @@ nmbs_t nmbs;
 static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
 	uarte_t* uarte = (uarte_t*)arg;
 
+	while(nrfx_timer_is_enabled(&timer_0));
+
 	uarte->set_rx();
 
+	uarte->rx.done = false;
 	uarte->rx.timeout = false;
 
 	if(byte_timeout_ms == 0) return 0;
-
-	if(byte_timeout_ms == 0) {
-		uarte->rx.done = true;
-	} else {
-		uarte->rx.done = false;
-	}
 
 	nrfx_err_t err = nrfx_uarte_rx(&(uarte->uarte), buf, count);
 
 	if(err != NRFX_SUCCESS) return -1;
 
 	if(byte_timeout_ms > 0) {
-		//запустить таймер
+		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
+		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL0, ticks, true);
+		nrfx_timer_clear(&timer_0);
+		nrfx_timer_enable(&timer_0);
 	}
 
 	//ждать таймаута или окончания приема
 	while((uarte->rx.timeout == false) && (uarte->rx.done == false));
 
-	if(uarte->rx.done == true) {
-		//остановить таймер
+	if(uarte->rx.timeout == true) {
+		nrfx_timer_disable(&timer_0);
+		nrfx_uarte_rx_abort(&(uarte->uarte));
+	}
 
+	if(uarte->rx.done == true) {
+		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL0);
+		nrfx_timer_disable(&timer_0);
 		return (int32_t)(uarte->rx.count);
 	}
 
@@ -246,15 +301,12 @@ static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms
 static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
 	uarte_t* uarte = (uarte_t*)arg;
 
+	while(nrfx_timer_is_enabled(&timer_0));
+
 	uarte->set_tx();
 
+	uarte->tx.done = false;
 	uarte->tx.timeout = false;
-
-	if(byte_timeout_ms == 0) {
-		uarte->tx.done = true;
-	} else {
-		uarte->tx.done = false;
-	}
 
 	nrfx_err_t err = nrfx_uarte_tx(&(uarte->uarte), buf, count);
 
@@ -263,17 +315,25 @@ static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_tim
 		return -1;
 	}
 
+	if(byte_timeout_ms == 0) uarte->tx.done = true;
+
 	if(byte_timeout_ms > 0) {
-		//запустить таймер
+		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
+		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL1, ticks, true);
+		nrfx_timer_clear(&timer_0);
+		nrfx_timer_enable(&timer_0);
 	}
 
 	//ждать таймаута или окончания передачи
 	while((uarte->tx.timeout == false) && (uarte->tx.done == false));
 
-	if(uarte->tx.done == true) {
-		//остановить таймер
+	if(uarte->tx.timeout == true) {
+		nrfx_uarte_tx_abort(&(uarte->uarte));
+	}
 
-		//return (int32_t)(count);
+	if(uarte->tx.done == true) {
+		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL1);
+		nrfx_timer_disable(&timer_0);
 		return (int32_t)(uarte->tx.count);
 	}
 
@@ -306,7 +366,8 @@ nmbs_error nmbs_client_init(nmbs_t* nmbs) {
 }
 
 void modbus_init(void) {
-	uarte_init();
+	uarte_0_init();
+	timer_0_init();
 	nmbs_client_init(&nmbs);
 }
 //nanomodbus end
@@ -318,7 +379,7 @@ const nrfx_twim_config_t twim_config = {
 		.scl = ((uint32_t)((17 << 0) | (0 << 5) | (0 << 31))), //P0.17 SCL
 		.sda = ((uint32_t)((15 << 0) | (0 << 5) | (0 << 31))), //P0.15 SDA
 		.frequency = 0x01980000,
-		.interrupt_priority = 1,
+		.interrupt_priority = 3,
 		.hold_bus_uninit = false
 };
 
