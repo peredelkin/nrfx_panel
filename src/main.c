@@ -258,40 +258,58 @@ void timer_0_init(void) {
 //nanomodbus begin
 nmbs_t nmbs;
 
+//TODO: перечитать описание в nanomodbus и проверить return значения в зависимости от условий
 static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
+	//заглушка flush fifo
+	//TODO: убедиться, что fifo сбрасывается драйвером, иначе сделать в прерывании уарт
+	if(byte_timeout_ms == 0) return 0;
+
 	uarte_t* uarte = (uarte_t*)arg;
 
+	//таймаут все еще тикает?
 	while(nrfx_timer_is_enabled(&timer_0));
 
+	//DIR принудительно на прием
 	uarte->set_rx();
 
+	//установка флагов
 	uarte->rx.done = false;
 	uarte->rx.timeout = false;
 
-	if(byte_timeout_ms == 0) return 0;
-
+	//старт чтения
 	nrfx_err_t err = nrfx_uarte_rx(&(uarte->uarte), buf, count);
 
+	//если шина занята или еще что-то
 	if(err != NRFX_SUCCESS) return -1;
 
 	if(byte_timeout_ms > 0) {
+		//расчитать количество тиков таймера
 		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
+		//установить компаратор таймаута чтения
 		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL0, ticks, true);
+		//сбросить таймер
 		nrfx_timer_clear(&timer_0);
+		//запустить таймер
 		nrfx_timer_enable(&timer_0);
 	}
 
 	//ждать таймаута или окончания приема
 	while((uarte->rx.timeout == false) && (uarte->rx.done == false));
 
+	//таймаут чтения
 	if(uarte->rx.timeout == true) {
-		nrfx_timer_disable(&timer_0);
+		//отменить прием
 		nrfx_uarte_rx_abort(&(uarte->uarte));
+		return 0; //TODO: вернуть количество действительно полученных данных
 	}
 
+	//все данные получены
 	if(uarte->rx.done == true) {
+		//выключить прерывание таймаута чтения
 		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL0);
+		//остановить таймер
 		nrfx_timer_disable(&timer_0);
+		//вернуть количество прочитанных байт.
 		return (int32_t)(uarte->rx.count);
 	}
 
@@ -299,28 +317,38 @@ static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms
 }
 
 static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
-	uarte_t* uarte = (uarte_t*)arg;
-
+	//таймаут все еще тикает?
 	while(nrfx_timer_is_enabled(&timer_0));
 
+	uarte_t* uarte = (uarte_t*)arg;
+
+	//DIR на передачу
 	uarte->set_tx();
 
+	//установка влагов
 	uarte->tx.done = false;
 	uarte->tx.timeout = false;
 
+	//старт передачи
 	nrfx_err_t err = nrfx_uarte_tx(&(uarte->uarte), buf, count);
 
+	//если шина занята или еще что-то
 	if(err != NRFX_SUCCESS) {
 		uarte->set_rx();
 		return -1;
 	}
 
-	if(byte_timeout_ms == 0) uarte->tx.done = true;
+	//не ждать конца передачи
+	if(byte_timeout_ms == 0) return count;
 
 	if(byte_timeout_ms > 0) {
+		//расчет количества тиков таймера
 		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
+		//установка компаратора таймаута записи
 		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL1, ticks, true);
+		//сброос таймера
 		nrfx_timer_clear(&timer_0);
+		//запуск таймера
 		nrfx_timer_enable(&timer_0);
 	}
 
@@ -328,16 +356,20 @@ static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_tim
 	while((uarte->tx.timeout == false) && (uarte->tx.done == false));
 
 	if(uarte->tx.timeout == true) {
+		//отмена передачи
 		nrfx_uarte_tx_abort(&(uarte->uarte));
+		return 0; //TODO: вернуть количество действительно полученных данных
 	}
 
 	if(uarte->tx.done == true) {
+		//выключение прерывания таймаута записи
 		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL1);
+		//остановка таймера
 		nrfx_timer_disable(&timer_0);
+		//возврат количества записанных байт
 		return (int32_t)(uarte->tx.count);
 	}
 
-	uarte->set_rx();
 	return -1;
 }
 
