@@ -12,10 +12,10 @@
 #include <lcd44780.h>
 #include <delay.h>
 #include "nrfx_twim.h"
-#include "nrfx_uarte.h"
-#include "nrfx_timer.h"
 #include "gpio.h"
+#include "nmbs_port.h"
 #include "nanomodbus.h"
+
 
 lcd44780_t scr_lcd44780;
 
@@ -87,11 +87,6 @@ void UICR_init() {
 }
 
 //uart begin
-void dumb_delay() {
-	volatile uint32_t count = 100000;
-	while(count--);
-}
-
 void rs485_set_rx(void) {
 	gpio_pins_clr_output(&rs485_dir_pin);
 }
@@ -100,26 +95,15 @@ void rs485_set_tx(void) {
 	gpio_pins_set_output(&rs485_dir_pin);
 }
 
-typedef struct {
-	volatile bool done;
-	volatile bool timeout;
-	size_t count;
-} uarte_rxtx_t;
-
-typedef struct {
-	nrfx_uarte_t uarte;
-	uarte_rxtx_t rx;
-	uarte_rxtx_t tx;
-	void (*set_rx)(void);
-	void (*set_tx)(void);
-} uarte_t;
-
-uarte_t nrf_uarte = {
+rs485_uarte_t rs485_uart = {
 		.uarte = NRFX_UARTE_INSTANCE(0),
+		.timer = NRFX_TIMER_INSTANCE(0),
 		.rx.done = true,
 		.rx.timeout = false,
+		.rx.timeout_ch = NRF_TIMER_CC_CHANNEL0,
 		.tx.done = true,
 		.tx.timeout = false,
+		.tx.timeout_ch = NRF_TIMER_CC_CHANNEL1,
 		.set_rx = rs485_set_rx,
 		.set_tx = rs485_set_tx
 };
@@ -129,70 +113,12 @@ nrfx_uarte_config_t uarte_config = {
 		.pselrxd = ((uint32_t)((28 << 0) | (0 << 5) | (0 << 31))), //P0.28 RXD
 		.pselcts = NRF_UARTE_PSEL_DISCONNECTED,
 		.pselrts = NRF_UARTE_PSEL_DISCONNECTED,
-		.p_context = &nrf_uarte,
+		.p_context = &rs485_uart,
 		.hwfc = NRF_UARTE_HWFC_DISABLED,
 		.parity = NRF_UARTE_PARITY_EXCLUDED,
 		.baudrate = NRF_UARTE_BAUDRATE_9600,
 		.interrupt_priority = 2,
 };
-
-void uarte_tx_done_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
-	uarte_t* uarte = (uarte_t*)p_context;
-	//переключиться на прием
-	uarte->set_rx();
-	//передача завершена
-	uarte->tx.count = p_event->data.rxtx.bytes;
-	if(uarte->tx.done == false) uarte->tx.done = true;
-}
-
-void uarte_rx_done_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
-	uarte_t* uarte = (uarte_t*)p_context;
-	//прием завершен
-	uarte->rx.count = p_event->data.rxtx.bytes;
-	if(uarte->rx.done == false) uarte->rx.done = true;
-}
-
-void uarte_error_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
-	uarte_t* uarte = (uarte_t*)p_context;
-	uint32_t error_mask = p_event->data.error.error_mask;
-
-	if(error_mask & NRF_UARTE_ERROR_OVERRUN_MASK) {
-
-	}
-
-	if(error_mask & NRF_UARTE_ERROR_PARITY_MASK) {
-
-	}
-
-	if(error_mask & NRF_UARTE_ERROR_FRAMING_MASK) {
-
-	}
-
-	if(error_mask & NRF_UARTE_ERROR_BREAK_MASK) {
-
-	}
-
-	//прием завершен
-	uarte->rx.done = true;
-}
-
-void uarte_0_event_handler(nrfx_uarte_event_t const* p_event, void* p_context) {
-	switch(p_event->type) {
-	case NRFX_UARTE_EVT_TX_DONE:
-		uarte_tx_done_handler(p_event, p_context);
-		break;
-	case NRFX_UARTE_EVT_RX_DONE:
-		uarte_rx_done_handler(p_event, p_context);
-		break;
-	case NRFX_UARTE_EVT_ERROR:
-		uarte_error_handler(p_event, p_context);
-		break;
-	default:
-		__NOP();
-		//__BKPT(0);
-		break;
-	}
-}
 
 void uarte_0_init(void) {
 	//P1.02 DIR: Output, Connect, Pull down, S0S1, Disabled
@@ -202,176 +128,26 @@ void uarte_0_init(void) {
 	//P0.28 RXD: Input, Connect, Pull up, S0S1, Disabled
 	NRF_P0->PIN_CNF[28] = (uint32_t)((0 << 0) | (0 << 1) | (3 << 2) | (0 << 8) | (0 << 16));
 
-	nrfx_uarte_init(&nrf_uarte.uarte,&uarte_config, uarte_0_event_handler);
+	nrfx_uarte_init(&rs485_uart.uarte,&uarte_config, uarte_event_handler);
 }
 //uart end
 
 //timer begin
-nrfx_timer_t timer_0 = NRFX_TIMER_INSTANCE(0);
-
 nrfx_timer_config_t timer_0_config = {
 		.frequency = NRF_TIMER_FREQ_250kHz,
 		.mode = NRF_TIMER_MODE_TIMER,
 		.bit_width = NRF_TIMER_BIT_WIDTH_32,
 		.interrupt_priority = 1,
-		.p_context = &nrf_uarte
+		.p_context = &rs485_uart
 };
 
-void nrfx_uart_rx_timeout_handler(void *p_context) {
-	uarte_t* uarte = (uarte_t*)p_context;
-
-	uarte->rx.timeout = true;
-
-	nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL0);
-	nrfx_timer_disable(&timer_0);
-}
-
-void nrfx_uart_tx_timeout_handler(void *p_context) {
-	uarte_t* uarte = (uarte_t*)p_context;
-
-	uarte->tx.timeout = true;
-
-	nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL1);
-	nrfx_timer_disable(&timer_0);
-}
-
-void nrfx_timer_0_event_handler(nrf_timer_event_t event_type, void *p_context) {
-	switch(event_type) {
-	case NRF_TIMER_EVENT_COMPARE0:
-		nrfx_uart_rx_timeout_handler(p_context);
-		break;
-	case NRF_TIMER_EVENT_COMPARE1:
-		nrfx_uart_tx_timeout_handler(p_context);
-		break;
-	default:
-		nrfx_timer_disable(&timer_0);
-		nrfx_timer_clear(&timer_0);
-		break;
-	}
-}
-
 void timer_0_init(void) {
-	nrfx_timer_init(&timer_0, &timer_0_config, nrfx_timer_0_event_handler);
+	nrfx_timer_init(&(rs485_uart.timer), &timer_0_config, uarte_timeout_handler);
 }
 //timer end
 
 //nanomodbus begin
 nmbs_t nmbs;
-
-//TODO: перечитать описание в nanomodbus и проверить return значения в зависимости от условий
-static int32_t read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
-	//заглушка flush fifo
-	//TODO: убедиться, что fifo сбрасывается драйвером, иначе сделать в прерывании уарт
-	if(byte_timeout_ms == 0) return 0;
-
-	uarte_t* uarte = (uarte_t*)arg;
-
-	//таймаут все еще тикает?
-	while(nrfx_timer_is_enabled(&timer_0));
-
-	//DIR принудительно на прием
-	uarte->set_rx();
-
-	//установка флагов
-	uarte->rx.done = false;
-	uarte->rx.timeout = false;
-
-	//старт чтения
-	nrfx_err_t err = nrfx_uarte_rx(&(uarte->uarte), buf, count);
-
-	//если шина занята или еще что-то
-	if(err != NRFX_SUCCESS) return -1;
-
-	if(byte_timeout_ms > 0) {
-		//расчитать количество тиков таймера
-		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
-		//установить компаратор таймаута чтения
-		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL0, ticks, true);
-		//сбросить таймер
-		nrfx_timer_clear(&timer_0);
-		//запустить таймер
-		nrfx_timer_enable(&timer_0);
-	}
-
-	//ждать таймаута или окончания приема
-	while((uarte->rx.timeout == false) && (uarte->rx.done == false));
-
-	//таймаут чтения
-	if(uarte->rx.timeout == true) {
-		//отменить прием
-		nrfx_uarte_rx_abort(&(uarte->uarte));
-		return 0; //TODO: вернуть количество действительно полученных данных
-	}
-
-	//все данные получены
-	if(uarte->rx.done == true) {
-		//выключить прерывание таймаута чтения
-		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL0);
-		//остановить таймер
-		nrfx_timer_disable(&timer_0);
-		//вернуть количество прочитанных байт.
-		return (int32_t)(uarte->rx.count);
-	}
-
-	return -1;
-}
-
-static int32_t write_serial(const uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, void* arg) {
-	//таймаут все еще тикает?
-	while(nrfx_timer_is_enabled(&timer_0));
-
-	uarte_t* uarte = (uarte_t*)arg;
-
-	//DIR на передачу
-	uarte->set_tx();
-
-	//установка влагов
-	uarte->tx.done = false;
-	uarte->tx.timeout = false;
-
-	//старт передачи
-	nrfx_err_t err = nrfx_uarte_tx(&(uarte->uarte), buf, count);
-
-	//если шина занята или еще что-то
-	if(err != NRFX_SUCCESS) {
-		uarte->set_rx();
-		return -1;
-	}
-
-	//не ждать конца передачи
-	if(byte_timeout_ms == 0) return count;
-
-	if(byte_timeout_ms > 0) {
-		//расчет количества тиков таймера
-		uint32_t ticks = nrfx_timer_ms_to_ticks(&timer_0, (uint32_t)byte_timeout_ms);
-		//установка компаратора таймаута записи
-		nrfx_timer_compare(&timer_0, NRF_TIMER_CC_CHANNEL1, ticks, true);
-		//сброос таймера
-		nrfx_timer_clear(&timer_0);
-		//запуск таймера
-		nrfx_timer_enable(&timer_0);
-	}
-
-	//ждать таймаута или окончания передачи
-	while((uarte->tx.timeout == false) && (uarte->tx.done == false));
-
-	if(uarte->tx.timeout == true) {
-		//отмена передачи
-		nrfx_uarte_tx_abort(&(uarte->uarte));
-		return 0; //TODO: вернуть количество действительно полученных данных
-	}
-
-	if(uarte->tx.done == true) {
-		//выключение прерывания таймаута записи
-		nrfx_timer_compare_int_disable(&timer_0, NRF_TIMER_CC_CHANNEL1);
-		//остановка таймера
-		nrfx_timer_disable(&timer_0);
-		//возврат количества записанных байт
-		return (int32_t)(uarte->tx.count);
-	}
-
-	return -1;
-}
 
 nmbs_error nmbs_client_init(nmbs_t* nmbs) {
     nmbs_platform_conf conf;
@@ -379,15 +155,15 @@ nmbs_error nmbs_client_init(nmbs_t* nmbs) {
     nmbs_platform_conf_create(&conf);
 
     conf.transport = NMBS_TRANSPORT_RTU;
-    conf.read = read_serial;
-    conf.write = write_serial;
+    conf.read = nmbs_read_serial;
+    conf.write = nmbs_write_serial;
 
     nmbs_error status = nmbs_client_create(nmbs, &conf);
     if (status != NMBS_ERROR_NONE) {
         return status;
     }
 
-    nmbs_set_platform_arg(nmbs, &nrf_uarte);
+    nmbs_set_platform_arg(nmbs, &rs485_uart);
 
     nmbs_set_byte_timeout(nmbs, 100);
     nmbs_set_read_timeout(nmbs, 1000);
@@ -634,6 +410,8 @@ int main(int argc, char *argv[]) {
 			lcd44780_n_puts(&scr_lcd44780, screen_str_0, 16);
 			lcd44780_set_ddram(&scr_lcd44780, 40);
 			lcd44780_n_puts(&scr_lcd44780, screen_str_1, 16);
+
+			delay_ms(100);
 
 			if(pca_keys.rise.bit.Up) {
 				if(addr == 5) {
