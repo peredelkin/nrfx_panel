@@ -109,7 +109,7 @@ int32_t nmbs_read_serial(uint8_t* buf, uint16_t count, int32_t byte_timeout_ms, 
 	rs485_uarte_t* uarte = (rs485_uarte_t*)arg;
 
 	//таймаут все еще тикает?
-	while(nrfx_timer_is_enabled(&(uarte->timer)));
+	if(nrfx_timer_is_enabled(&(uarte->timer))) return -1;
 
 	//DIR принудительно на прием
 	uarte->set_rx();
@@ -162,7 +162,7 @@ int32_t nmbs_write_serial(const uint8_t* buf, uint16_t count, int32_t byte_timeo
 	rs485_uarte_t* uarte = (rs485_uarte_t*)arg;
 
 	//таймаут все еще тикает?
-	while(nrfx_timer_is_enabled(&(uarte->timer)));
+	if(nrfx_timer_is_enabled(&(uarte->timer))) return -1;
 
 	//DIR на передачу
 	uarte->set_tx();
