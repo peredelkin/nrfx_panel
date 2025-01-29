@@ -599,8 +599,13 @@ int main(int argc, char *argv[]) {
 	uint16_t data[6] = {0};
 	nmbs_error nmbs_err;
 
-	char str_0[16];
-	char str_1[16];
+	char str_0[17];
+	int str_0_count;
+	char screen_str_0[17];
+
+	char str_1[17];
+	int str_1_count;
+	char screen_str_1[17];
 
 	while (1) {
 		if (nrfx_pca9539_read(&nrf_twim, 116, &pca_keys.cmd, &pca_keys.current.all, 1) == NRFX_SUCCESS) {
@@ -609,27 +614,26 @@ int main(int argc, char *argv[]) {
 			pca_keys.fall.all = pca_keys.old.all & ~pca_keys.current.all;
 			pca_keys.old.all = pca_keys.current.all;
 
-			if (pca_keys.rise.bit.Pl) {
-				snprintf(str_0, 16, "Addr: %d", addr);
+			nmbs_err = nmbs_read_holding_registers(&nmbs, addr, 1, &data[0]);
 
-				nmbs_err = nmbs_read_holding_registers(&nmbs, addr, 1, &data[0]);
-				if(nmbs_err == NMBS_ERROR_NONE) {
-					snprintf(str_1, 16, "Data: %d", data[0]);
-				} else {
-					snprintf(str_1, 16, "Error %d", nmbs_err);
-				}
+			str_0_count = snprintf(str_0, 16, "Addr: %d", addr);
 
-				lcd44780_clear(&scr_lcd44780);
-				delay_ms(10);
-				lcd44780_set_ddram(&scr_lcd44780, 0);
-				delay_ms(10);
-				lcd44780_puts(&scr_lcd44780, str_0);
-				delay_ms(10);
-				lcd44780_set_ddram(&scr_lcd44780, 40);
-				delay_ms(10);
-				lcd44780_puts(&scr_lcd44780, str_1);
-				delay_ms(10);
+			if (nmbs_err == NMBS_ERROR_NONE) {
+				str_1_count = snprintf(str_1, 16, "Data: %d", data[0]);
+			} else {
+				str_1_count = snprintf(str_1, 16, "Error %d", nmbs_err);
 			}
+
+			memset(screen_str_0, *(" "), sizeof(screen_str_0));
+			memset(screen_str_1, *(" "), sizeof(screen_str_1));
+
+			memcpy(screen_str_0, str_0, str_0_count);
+			memcpy(screen_str_1, str_1, str_1_count);
+
+			lcd44780_set_ddram(&scr_lcd44780, 0);
+			lcd44780_n_puts(&scr_lcd44780, screen_str_0, 16);
+			lcd44780_set_ddram(&scr_lcd44780, 40);
+			lcd44780_n_puts(&scr_lcd44780, screen_str_1, 16);
 
 			if(pca_keys.rise.bit.Up) {
 				if(addr == 5) {
