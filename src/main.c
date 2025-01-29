@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
 	modbus_init();
 
 	uint16_t addr = 0;
-	uint16_t data[6] = {0};
+	uint16_t data[2] = {0};
 	nmbs_error nmbs_err;
 
 	char str_0[17];
@@ -390,14 +390,14 @@ int main(int argc, char *argv[]) {
 			pca_keys.fall.all = pca_keys.old.all & ~pca_keys.current.all;
 			pca_keys.old.all = pca_keys.current.all;
 
-			nmbs_err = nmbs_read_holding_registers(&nmbs, addr, 1, &data[0]);
+			nmbs_err = nmbs_read_holding_registers(&nmbs, (uint16_t)(addr << 1), 2, data);
 
 			str_0_count = snprintf(str_0, 16, "Addr: %d", addr);
 
 			if (nmbs_err == NMBS_ERROR_NONE) {
-				str_1_count = snprintf(str_1, 16, "Data: %d", data[0]);
+				str_1_count = snprintf(str_1, 16, "Data: %0.2f", (*((int32_t*)data))/32768.0f);
 			} else {
-				str_1_count = snprintf(str_1, 16, "Error %d", nmbs_err);
+				str_1_count = snprintf(str_1, 16, "Error %i", nmbs_err);
 			}
 
 			memset(screen_str_0, *(" "), sizeof(screen_str_0));
