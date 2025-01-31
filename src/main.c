@@ -372,6 +372,7 @@ int main(int argc, char *argv[]) {
 	modbus_init();
 
 	uint16_t addr = 0;
+	uint8_t leds[2] = {0};
 	uint16_t data[2] = {0};
 	nmbs_error nmbs_err;
 
@@ -391,6 +392,11 @@ int main(int argc, char *argv[]) {
 			pca_keys.old.all = pca_keys.current.all;
 
 			nmbs_err = nmbs_read_holding_registers(&nmbs, (uint16_t)(addr << 1), 2, data);
+
+			if(nmbs_read_holding_registers(&nmbs, (uint16_t)(6 << 1), 1, (uint16_t*)leds) == NMBS_ERROR_NONE) {
+				pca_leds.data.all = leds[0];
+				nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
+			}
 
 			str_0_count = snprintf(str_0, 16, "Addr: %d", addr);
 
@@ -428,7 +434,6 @@ int main(int argc, char *argv[]) {
 					addr--;
 				}
 			}
-			//nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
 		}
 	}
 }
