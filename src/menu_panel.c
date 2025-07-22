@@ -5,8 +5,14 @@
  *      Author: ruslan
  */
 
-//#define MENU_MACRO
-//#define MENU_DESCR_MACRO
+#ifndef MENU_MACRO
+#define MENU_MACRO
+#endif
+
+#ifndef MENU_DESCR_MACRO
+#define MENU_DESCR_MACRO
+#endif
+
 #define MENU_DESCRS_ATTRIBS const
 #define MENU_ITEMS_ATTRIBS
 #include "menu.h"
