@@ -367,6 +367,45 @@ char screen_str_1[17];
 extern menu_t panel_menu_0;
 extern void menu_panel_init(void);
 
+char menu_str_val[33];
+int menu_val_tmp;
+
+void edit_menu_item_value(menu_value_t* value)
+{
+    if(value == NULL) return;
+
+    switch(menu_value_type(value)){
+        case MENU_VALUE_TYPE_STRING:
+            break;
+        case MENU_VALUE_TYPE_INT:
+            break;
+        case MENU_VALUE_TYPE_BOOL:
+            menu_value_set_bool(value, !menu_value_bool(value));
+            break;
+        case MENU_VALUE_TYPE_FIXED:
+            break;
+        case MENU_VALUE_TYPE_ENUM:
+            if(pca_keys.rise.bit.Pl) {
+            	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
+            	if (menu_val_tmp > menu_value_enum_count(value)) {
+            		menu_val_tmp = menu_value_enum_count(value);
+            	}
+            	menu_value_enum_set_current(value, menu_val_tmp);
+            }
+
+            if(pca_keys.rise.bit.Mn) {
+            	menu_val_tmp = (int) menu_value_enum_current(value) - 1;
+            	if (menu_val_tmp < 0) {
+            		menu_val_tmp = 0;
+            	}
+            	menu_value_enum_set_current(value, menu_val_tmp);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void paint_menu_item_value(menu_value_t* value)
 {
     if(value == NULL) return;
@@ -394,10 +433,11 @@ void paint_menu_item_value(menu_value_t* value)
     }
 }
 
-static void menu_panel_paint_item(menu_item_t* item) {
+void menu_panel_paint_item(menu_item_t* item) {
     str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item));
 
     if(menu_item_has_value(item)){
+    	edit_menu_item_value(menu_item_value(menu_current(&panel_menu_0)));
         paint_menu_item_value(menu_item_value(item));
     } else {
     	if(item->child != NULL) {
