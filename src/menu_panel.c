@@ -5,8 +5,8 @@
  *      Author: ruslan
  */
 
-#define MENU_MACRO
-#define MENU_DESCR_MACRO
+//#define MENU_MACRO
+//#define MENU_DESCR_MACRO
 #define MENU_DESCRS_ATTRIBS const
 #define MENU_ITEMS_ATTRIBS
 #include "menu.h"
