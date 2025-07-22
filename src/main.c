@@ -15,6 +15,7 @@
 #include "gpio.h"
 #include "nmbs_port.h"
 #include "nanomodbus.h"
+#include "menu.h"
 
 
 lcd44780_t scr_lcd44780;
@@ -70,7 +71,6 @@ void scr_lcd44780_init() {
 	lcd44780_entry_mode_set(&scr_lcd44780, LCD44780_CURSOR_MOVE_RIGHT, LCD44780_DISPLAY_SHIFT_OFF);
 	lcd44780_display_control(&scr_lcd44780, LCD44780_DISPLAY_ON, LCD44780_CURSOR_OFF, LCD44780_CURSOR_BLINK_OFF);
 	lcd44780_function_set(&scr_lcd44780, LCD44780_LINE_NUMBER_2, LCD44780_FONT_TYPE_5X8);
-	lcd44780_puts(&scr_lcd44780, "LCD initialized!");
 }
 
 void dcdc_init() {
@@ -354,6 +354,93 @@ void SysTick_Handler(void)
 	}
 }
 
+//TODO: запихнуть в какую нибудь структуру
+char str_0[17];
+int str_0_count;
+char screen_str_0[17];
+
+char str_1[17];
+int str_1_count;
+char screen_str_1[17];
+
+//TODO: убрать
+extern menu_t panel_menu_0;
+extern void menu_panel_init(void);
+
+void paint_menu_item_value(menu_value_t* value)
+{
+    if(value == NULL) return;
+
+    switch(menu_value_type(value)){
+        case MENU_VALUE_TYPE_STRING:
+        	str_1_count = snprintf(str_1, 16, "%s", menu_value_string(value));
+            break;
+        case MENU_VALUE_TYPE_INT:
+        	str_1_count = snprintf(str_1, 16, "%d", (int)menu_value_int(value));
+            break;
+        case MENU_VALUE_TYPE_BOOL:
+        	str_1_count = snprintf(str_1, 16, "%s", menu_value_bool(value) ? "true" : "false");
+            break;
+        case MENU_VALUE_TYPE_FIXED:
+        	str_1_count = snprintf(str_1, 16, "0x%x", (int)menu_value_int(value));
+            break;
+        case MENU_VALUE_TYPE_ENUM:
+            value = menu_value_enum_current_value(value);
+            paint_menu_item_value(value);
+            break;
+        default:
+        	str_1_count = snprintf(str_1, 16, "-");
+            break;
+    }
+}
+
+static void menu_panel_paint_item(menu_item_t* item) {
+    str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item));
+
+    if(menu_item_has_value(item)){
+        paint_menu_item_value(menu_item_value(item));
+    } else {
+    	if(item->child != NULL) {
+    		str_1_count = snprintf(str_1, 16, "-> %s", menu_item_text(item->child));
+    	} else {
+    		str_1_count = snprintf(str_1, 16, "-");
+    	}
+    }
+
+	memset(screen_str_0, *(" "), sizeof(screen_str_0));
+	memset(screen_str_1, *(" "), sizeof(screen_str_1));
+
+	memcpy(screen_str_0, str_0, str_0_count);
+	memcpy(screen_str_1, str_1, str_1_count);
+
+	lcd44780_set_ddram(&scr_lcd44780, 0);
+	lcd44780_n_puts(&scr_lcd44780, screen_str_0, 16);
+	lcd44780_set_ddram(&scr_lcd44780, 40);
+	lcd44780_n_puts(&scr_lcd44780, screen_str_1, 16);
+}
+
+void menu_panel_process(void) {
+    menu_item_t* item = menu_current(&panel_menu_0);
+
+    menu_panel_paint_item(item);
+
+    if(pca_keys.rise.bit.Up) {
+    	menu_prev(&panel_menu_0);
+    }
+
+    if(pca_keys.rise.bit.Dn) {
+    	menu_next(&panel_menu_0);
+    }
+
+    if(pca_keys.rise.bit.Ent) {
+    	menu_down(&panel_menu_0);
+    }
+
+    if(pca_keys.rise.bit.Esc) {
+    	menu_up(&panel_menu_0);
+    }
+}
+
 int main(int argc, char *argv[]) {
 	//UICR_init();
 	dcdc_init();
@@ -371,18 +458,11 @@ int main(int argc, char *argv[]) {
 
 	modbus_init();
 
+	menu_panel_init();
+
 	uint16_t addr = 0;
 	uint8_t leds[2] = {0};
 	uint16_t data[2] = {0};
-	nmbs_error nmbs_err;
-
-	char str_0[17];
-	int str_0_count;
-	char screen_str_0[17];
-
-	char str_1[17];
-	int str_1_count;
-	char screen_str_1[17];
 
 	while (1) {
 		if (nrfx_pca9539_read(&nrf_twim, 116, &pca_keys.cmd, &pca_keys.current.all, 1) == NRFX_SUCCESS) {
@@ -391,33 +471,20 @@ int main(int argc, char *argv[]) {
 			pca_keys.fall.all = pca_keys.old.all & ~pca_keys.current.all;
 			pca_keys.old.all = pca_keys.current.all;
 
-			nmbs_err = nmbs_read_holding_registers(&nmbs, (uint16_t)(addr << 1), 2, data);
+//			if(nmbs_read_holding_registers(&nmbs, (uint16_t)(6 << 1), 1, (uint16_t*)leds) == NMBS_ERROR_NONE) {
+//				pca_leds.data.all = leds[0];
+//				nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
+//			}
 
-			if(nmbs_read_holding_registers(&nmbs, (uint16_t)(6 << 1), 1, (uint16_t*)leds) == NMBS_ERROR_NONE) {
-				pca_leds.data.all = leds[0];
-				nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
-			}
+//			if (nmbs_read_holding_registers(&nmbs, (uint16_t)(addr << 1), 2, data) == NMBS_ERROR_NONE) {
+//				str_1_count = snprintf(str_1, 16, "Data: %0.2f", (*((int32_t*)data))/32768.0f);
+//			} else {
+//				str_1_count = snprintf(str_1, 16, "Error %i", nmbs_err);
+//			}
 
-			str_0_count = snprintf(str_0, 16, "Addr: %d", addr);
+			menu_panel_process();
 
-			if (nmbs_err == NMBS_ERROR_NONE) {
-				str_1_count = snprintf(str_1, 16, "Data: %0.2f", (*((int32_t*)data))/32768.0f);
-			} else {
-				str_1_count = snprintf(str_1, 16, "Error %i", nmbs_err);
-			}
-
-			memset(screen_str_0, *(" "), sizeof(screen_str_0));
-			memset(screen_str_1, *(" "), sizeof(screen_str_1));
-
-			memcpy(screen_str_0, str_0, str_0_count);
-			memcpy(screen_str_1, str_1, str_1_count);
-
-			lcd44780_set_ddram(&scr_lcd44780, 0);
-			lcd44780_n_puts(&scr_lcd44780, screen_str_0, 16);
-			lcd44780_set_ddram(&scr_lcd44780, 40);
-			lcd44780_n_puts(&scr_lcd44780, screen_str_1, 16);
-
-			delay_ms(100);
+			delay_ms(20);
 
 			if(pca_keys.rise.bit.Up) {
 				if(addr == 5) {
