@@ -434,18 +434,17 @@ void paint_menu_item_value(menu_value_t* value)
 }
 
 void menu_panel_paint_item(menu_item_t* item) {
-    str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item));
-
-    if(menu_item_has_value(item)){
-    	edit_menu_item_value(menu_item_value(menu_current(&panel_menu_0)));
-        paint_menu_item_value(menu_item_value(item));
-    } else {
-    	if(item->child != NULL) {
-    		str_1_count = snprintf(str_1, 16, "-> %s", menu_item_text(item->child));
-    	} else {
-    		str_1_count = snprintf(str_1, 16, "-");
-    	}
-    }
+	if (menu_item_parent(item) == NULL) {
+		str_0_count = snprintf(str_0, 16, "Main menu");
+		str_1_count = snprintf(str_1, 16, "%s", menu_item_text(item));
+	} else if (menu_item_has_value(item)) {
+		str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item));
+		edit_menu_item_value(menu_item_value(menu_current(&panel_menu_0)));
+		paint_menu_item_value(menu_item_value(item));
+	} else {
+		str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item->parent));
+		str_1_count = snprintf(str_1, 16, "%s", menu_item_text(item));
+	}
 
 	memset(screen_str_0, *(" "), sizeof(screen_str_0));
 	memset(screen_str_1, *(" "), sizeof(screen_str_1));
