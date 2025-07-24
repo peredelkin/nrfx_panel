@@ -17,6 +17,41 @@
 #include "nanomodbus.h"
 #include "menu.h"
 
+enum {
+	MODBUS_RTU_CUSTOM_FUNC_REG_READ = 0x64,
+	MODBUS_RTU_CUSTOM_FUNC_REG_WRITE,
+};
+
+nmbs_error nmbs_read_reg(nmbs_t* nmbs, reg_t* reg, void* data_out) {
+	nmbs_error error = NMBS_ERROR_NONE;
+
+	reg_id_t id = reg_id(reg);
+
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, id, sizeof(reg_id_t));
+
+	if(error != NMBS_ERROR_NONE) return error;
+
+	size_t data_size = reg_data_size(reg);
+
+	switch(data_size)
+
+	//error = nmbs_receive_raw_pdu_response();
+
+	return error;
+}
+
+nmbs_error nmbs_write_reg(nmbs_t* nmbs, reg_t* reg, void* data_in) {
+	nmbs_error error = NMBS_ERROR_NONE;
+
+	//error = nmbs_send_raw_pdu();
+
+	if(error != NMBS_ERROR_NONE) return error;
+
+	//error = nmbs_receive_raw_pdu_response();
+
+	return error;
+}
+
 
 lcd44780_t scr_lcd44780;
 
@@ -355,13 +390,13 @@ void SysTick_Handler(void)
 }
 
 //TODO: запихнуть в какую нибудь структуру
-char str_0[17];
+char str_0[34];
 int str_0_count;
-char screen_str_0[17];
+char screen_str_0[16];
 
-char str_1[17];
+char str_1[34];
 int str_1_count;
-char screen_str_1[17];
+char screen_str_1[16];
 
 //TODO: убрать
 extern menu_t panel_menu_0;
@@ -370,8 +405,10 @@ extern void menu_panel_init(void);
 char menu_str_val[33];
 int menu_val_tmp;
 
-void edit_menu_item_value(menu_value_t* value)
+void edit_menu_item_value(menu_item_t* item)
 {
+	menu_value_t* value = menu_item_value(item);
+
     if(value == NULL) return;
 
     switch(menu_value_type(value)){
@@ -385,6 +422,7 @@ void edit_menu_item_value(menu_value_t* value)
         case MENU_VALUE_TYPE_FIXED:
             break;
         case MENU_VALUE_TYPE_ENUM:
+
             if(pca_keys.rise.bit.Pl) {
             	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
             	if (menu_val_tmp > menu_value_enum_count(value)) {
@@ -406,44 +444,46 @@ void edit_menu_item_value(menu_value_t* value)
     }
 }
 
-void paint_menu_item_value(menu_value_t* value)
+void paint_menu_item_value(menu_item_t* item)
 {
+	menu_value_t* value = menu_item_value(item);
+
     if(value == NULL) return;
 
     switch(menu_value_type(value)){
         case MENU_VALUE_TYPE_STRING:
-        	str_1_count = snprintf(str_1, 16, "%s", menu_value_string(value));
+        	str_1_count = snprintf(str_1, 17, "%s", menu_value_string(value));
             break;
         case MENU_VALUE_TYPE_INT:
-        	str_1_count = snprintf(str_1, 16, "%d", (int)menu_value_int(value));
+        	str_1_count = snprintf(str_1, 17, "%d", (int)menu_value_int(value));
             break;
         case MENU_VALUE_TYPE_BOOL:
-        	str_1_count = snprintf(str_1, 16, "%s", menu_value_bool(value) ? "true" : "false");
+        	str_1_count = snprintf(str_1, 17, "%s", menu_value_bool(value) ? "true" : "false");
             break;
         case MENU_VALUE_TYPE_FIXED:
-        	str_1_count = snprintf(str_1, 16, "0x%x", (int)menu_value_int(value));
+        	str_1_count = snprintf(str_1, 17, "0x%x", (int)menu_value_int(value));
             break;
         case MENU_VALUE_TYPE_ENUM:
             value = menu_value_enum_current_value(value);
             paint_menu_item_value(value);
             break;
         default:
-        	str_1_count = snprintf(str_1, 16, "-");
+        	str_1_count = snprintf(str_1, 17, "-");
             break;
     }
 }
 
 void menu_panel_paint_item(menu_item_t* item) {
 	if (menu_item_parent(item) == NULL) {
-		str_0_count = snprintf(str_0, 16, "Main menu");
-		str_1_count = snprintf(str_1, 16, "%s", menu_item_text(item));
+		str_0_count = snprintf(str_0, 17, "Main menu");
+		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
 	} else if (menu_item_has_value(item)) {
-		str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item));
-		edit_menu_item_value(menu_item_value(menu_current(&panel_menu_0)));
-		paint_menu_item_value(menu_item_value(item));
+		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item));
+		edit_menu_item_value(item);
+		paint_menu_item_value(item);
 	} else {
-		str_0_count = snprintf(str_0, 16, "%s", menu_item_text(item->parent));
-		str_1_count = snprintf(str_1, 16, "%s", menu_item_text(item));
+		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item->parent));
+		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
 	}
 
 	memset(screen_str_0, *(" "), sizeof(screen_str_0));
