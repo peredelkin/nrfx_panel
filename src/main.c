@@ -18,6 +18,7 @@
 #include "menu.h"
 #include "regs.h"
 #include "reg_ids.h"
+#include "buf_reg.h"
 
 enum {
 	MODBUS_RTU_CUSTOM_FUNC_REG_READ = 0x64,
@@ -32,85 +33,6 @@ struct {
 #pragma pack(pop)
 
 uint8_t nmbs_response_data[253]; //TODO: что то сделатьс этим
-
-//! Окончание списка.
-//! Идентификатор.
-#define SETTINGS_END_ID ((uint32_t)-1)
-//! Тип данных.
-#define SETTINGS_END_TYPE ((uint8_t)-1)
-//! Размер данных.
-#define SETTINGS_END_DATA_SIZE ((uint8_t)-1)
-
-size_t buf_get_reg(void* data_from, size_t index, size_t index_max, void *data_to, size_t size) {
-	uint8_t *data_from_bytes = (uint8_t*) data_from;
-	uint8_t *data_to_bytes = (uint8_t*) data_to;
-
-	size_t i = 0;
-	for (; i < size; i++) {
-		if (index >= index_max) break;
-		if (data_to_bytes) data_to_bytes[i] = data_from_bytes[index];
-		index++;
-	}
-	return i;
-}
-
-int buf_get_reg_atomic(void* data_from, size_t* m_index, size_t index_max, reg_id_t* p_id, reg_type_t* p_type, size_t* p_size, void* p_data, size_t data_size_max)
-{
-    size_t id_getted = 0;
-    size_t type_getted = 0;
-    size_t size_getted = 0;
-    size_t data_getted = 0;
-    size_t data_size = 0;
-
-    uint32_t id;
-    uint8_t type;
-    uint8_t size;
-
-    size_t index = *m_index;
-
-    if(index + sizeof(id) > index_max) return -1;
-    id_getted = buf_get_reg(data_from, index, index_max, &id, sizeof(id));
-    if(id_getted != sizeof(id)) return -1;
-
-    index += id_getted;
-
-    if(index + sizeof(type) > index_max) return -1;
-    type_getted = buf_get_reg(data_from, index, index_max, &type, sizeof(type));
-    if(type_getted != sizeof(type)) return -1;
-
-    index += type_getted;
-
-    if(index + sizeof(size) > index_max) return -1;
-    size_getted = buf_get_reg(data_from, index, index_max, &size, sizeof(size));
-    if(size_getted != sizeof(size)) return -1;
-
-    index += size_getted;
-
-    if(id != SETTINGS_END_ID || type != SETTINGS_END_TYPE || size != SETTINGS_END_DATA_SIZE){
-
-        data_size = (size_t)size;
-
-        if(index + data_size > index_max) return -1;
-
-        if(data_size <= data_size_max){
-            data_getted = buf_get_reg(data_from, index, index_max, p_data, data_size);
-            if(data_getted != data_size) return -1;
-        }
-
-        index += data_size;
-
-        if(p_size) *p_size = data_getted;
-    }else{
-        if(p_size) *p_size = (size_t)size;
-    }
-
-    if(p_type) *p_type = (reg_type_t)type;
-    if(p_id) *p_id = id;
-
-    *m_index = index;
-
-    return (int)(sizeof(id) + sizeof(type) + sizeof(size) + data_size);
-}
 
 nmbs_error nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
