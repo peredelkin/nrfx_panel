@@ -12,7 +12,7 @@ BEGIN{
             for(i = 1; i <= NF; i ++){
                 if(NR > 5 && i == 2){
                     #printf "&regs_data[%u]", count, #"NULL"
-                    printf "%s", "NULL"
+                    printf "%s", "&regs_data_union"
                 }else{
                     printf "%s", trim($i)
                 }
