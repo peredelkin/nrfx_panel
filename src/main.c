@@ -501,8 +501,8 @@ void edit_menu_item_value(menu_item_t* item)
 
 	            if(pca_keys.rise.bit.Pl) {
 	            	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
-	            	if (menu_val_tmp > menu_value_enum_count(value)) {
-	            		menu_val_tmp = menu_value_enum_count(value);
+	            	if (menu_val_tmp > menu_value_enum_count(value) -1) {
+	            		menu_val_tmp = menu_value_enum_count(value) - 1;
 	            	}
 	            	reg_set_valuel(reg_ptr, menu_val_tmp);
 	            	if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
