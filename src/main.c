@@ -472,34 +472,39 @@ extern menu_t panel_menu_0;
 extern void menu_panel_init(void);
 
 char menu_str_val[33];
-int menu_val_tmp;
+
+void menu_reg_value_enum_clamp(int* val, int max) {
+	if (*val > max) {
+		*val = max;
+	}
+
+	if (*val < 0) {
+		*val = 0;
+	}
+}
 
 void menu_reg_value_enum_read(reg_t* reg, menu_value_t* value) {
 	if(nmbs_read_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
-		menu_val_tmp = reg_valuel(reg);
-	} else {
-		menu_val_tmp = ((int)menu_value_enum_current(value));
+
+		int tmp_val = reg_valuel(reg);
+		int val_max = ((int)menu_value_enum_count(value)) - 1;
+
+		menu_reg_value_enum_clamp(&tmp_val, val_max);
+
+		menu_value_enum_set_current(value, tmp_val);
 	}
 }
 
 void menu_reg_value_enum_change(reg_t* reg, menu_value_t* value, int val) {
-	menu_val_tmp += val;
+	int tmp_val = ((int)menu_value_enum_current(value)) + val;
+	int val_max = ((int)menu_value_enum_count(value)) - 1;
 
-	if(val > 0) {
-    	if (menu_val_tmp > menu_value_enum_count(value) - 1) {
-    		menu_val_tmp = menu_value_enum_count(value) - 1;
-    	}
-	}
+	menu_reg_value_enum_clamp(&tmp_val, val_max);
 
-	if(val < 0) {
-    	if (menu_val_tmp < 0) {
-    		menu_val_tmp = 0;
-    	}
-	}
+	reg_set_valuel(reg, tmp_val);
 
-	reg_set_valuel(reg, menu_val_tmp);
 	if(nmbs_write_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
-		menu_value_enum_set_current(value, menu_val_tmp);
+		//menu_value_enum_set_current(value, tmp_val);
 	}
 }
 
