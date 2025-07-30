@@ -29,26 +29,43 @@ enum {
 struct {
 		reg_id_t id;
 		uint8_t count;
-	} panel_request;
+	} nmbs_reg_request;
 #pragma pack(pop)
 
-uint8_t nmbs_response_data[253]; //TODO: что то сделатьс этим
+#pragma pack(push, 1)
+struct {
+		reg_id_t id;
+		uint8_t count;
+	} nmbs_reg_response;
+#pragma pack(pop)
 
+#define NMBS_PDU_SIZE_MAX 252
+uint8_t nmbs_reg_request_data[NMBS_PDU_SIZE_MAX];
+uint8_t nmbs_reg_response_data[NMBS_PDU_SIZE_MAX];
+
+//TODO: причесать этот колхоз
 nmbs_error nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
 
 	nmbs_error error = NMBS_ERROR_NONE;
 
-	panel_request.id = reg->id;
-	panel_request.count = count;
+	//заполним запрос
+	nmbs_reg_request.id = reg->id;
+	nmbs_reg_request.count = count;
 
-	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, (uint8_t*)&panel_request, sizeof(panel_request));
+	//скопируем запрос
+	memcpy(nmbs_reg_request_data, &nmbs_reg_request, sizeof(nmbs_reg_request));
+
+	//отправим запрос
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, nmbs_reg_request_data, sizeof(nmbs_reg_request));
 
 	if(error != NMBS_ERROR_NONE) return error;
 
-	size_t request_data_size = reg_data_size(reg);
+	//вычислим ожидаемый размер данных
+	size_t request_data_size = 4 + 1 + 1 + reg_data_size(reg);
 
-	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, (4+1+1+request_data_size)); //TODO: прикрутить макросами
+	//получим данные
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, request_data_size);
 
 	if(error != NMBS_ERROR_NONE) return error;
 
@@ -58,22 +75,48 @@ nmbs_error nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	size_t p_size = 0;
 	uint8_t p_data[4];
 
-	int reg_getted = buf_get_reg_atomic(nmbs_response_data, &index, sizeof(nmbs_response_data), &p_id, &p_type, &p_size, p_data, 4);
+	//прочитаем данные
+	int reg_getted = buf_get_reg_atomic(nmbs_reg_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, 4);
 	if(reg_getted < 0) return NMBS_ERROR_INVALID_ARGUMENT;
 
-	memcpy(reg->data, p_data, p_size);
+	//сравним на соответствие запросу
+	if((reg->id == p_id) && (reg->type == p_type) && (reg_data_size(reg) == p_size)) {
+		memcpy(reg->data, p_data, p_size);
+	} else {
+		return NMBS_ERROR_INVALID_RESPONSE;
+	}
 
 	return error;
 }
 
-nmbs_error nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, void* data_in) {
+//TODO: причесать этот колхоз
+nmbs_error nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
+	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
+
 	nmbs_error error = NMBS_ERROR_NONE;
 
-	//error = nmbs_send_raw_pdu();
+	//заполним заголовок запроса
+	nmbs_reg_request.id = reg->id;
+	nmbs_reg_request.count = count;
+
+	//скопируем заголовок запроса
+	memcpy(nmbs_reg_request_data, &nmbs_reg_request, sizeof(nmbs_reg_request));
+
+	//получим смещение для заполнения запроса данными
+	size_t index = sizeof(nmbs_reg_request);
+
+	//заполним запрос данными
+	int reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg);
+
+	//отправим запрос
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_WRITE, nmbs_reg_request_data, sizeof(nmbs_reg_request) + reg_putted);
 
 	if(error != NMBS_ERROR_NONE) return error;
 
-	//error = nmbs_receive_raw_pdu_response();
+	//получим данные
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, sizeof(nmbs_reg_response));
+
+	if(error != NMBS_ERROR_NONE) return error;
 
 	return error;
 }
@@ -437,6 +480,8 @@ void edit_menu_item_value(menu_item_t* item)
 
     if(value == NULL) return;
 
+    reg_t* reg_ptr = regs_find(item->id);
+
     switch(menu_value_type(value)){
         case MENU_VALUE_TYPE_STRING:
             break;
@@ -448,32 +493,42 @@ void edit_menu_item_value(menu_item_t* item)
         case MENU_VALUE_TYPE_FIXED:
             break;
         case MENU_VALUE_TYPE_ENUM:
+			if(reg_ptr != NULL) {
+				if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+					menu_val_tmp = reg_valuel(reg_ptr);
+					menu_value_enum_set_current(value, menu_val_tmp);
+				}
 
-            if(pca_keys.rise.bit.Pl) {
-            	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
-            	if (menu_val_tmp > menu_value_enum_count(value)) {
-            		menu_val_tmp = menu_value_enum_count(value);
-            	}
-            	menu_value_enum_set_current(value, menu_val_tmp);
-            }
+	            if(pca_keys.rise.bit.Pl) {
+	            	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
+	            	if (menu_val_tmp > menu_value_enum_count(value)) {
+	            		menu_val_tmp = menu_value_enum_count(value);
+	            	}
+	            	reg_set_valuel(reg_ptr, menu_val_tmp);
+	            	if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+	            		menu_value_enum_set_current(value, menu_val_tmp);
+	            	}
+	            }
 
-            if(pca_keys.rise.bit.Mn) {
-            	menu_val_tmp = (int) menu_value_enum_current(value) - 1;
-            	if (menu_val_tmp < 0) {
-            		menu_val_tmp = 0;
-            	}
-            	menu_value_enum_set_current(value, menu_val_tmp);
-            }
+	            if(pca_keys.rise.bit.Mn) {
+	            	menu_val_tmp = (int) menu_value_enum_current(value) - 1;
+	            	if (menu_val_tmp < 0) {
+	            		menu_val_tmp = 0;
+	            	}
+	            	reg_set_valuel(reg_ptr, menu_val_tmp);
+	            	if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+	            		menu_value_enum_set_current(value, menu_val_tmp);
+	            	}
+	            }
+			}
             break;
         default:
             break;
     }
 }
 
-void paint_menu_item_value(menu_item_t* item)
+void paint_menu_item_value(menu_value_t* value)
 {
-	menu_value_t* value = menu_item_value(item);
-
     if(value == NULL) return;
 
     switch(menu_value_type(value)){
@@ -491,7 +546,7 @@ void paint_menu_item_value(menu_item_t* item)
             break;
         case MENU_VALUE_TYPE_ENUM:
             value = menu_value_enum_current_value(value);
-            paint_menu_item_value(item);
+            paint_menu_item_value(value);
             break;
         default:
         	str_1_count = snprintf(str_1, 17, "-");
@@ -506,7 +561,7 @@ void menu_panel_paint_item(menu_item_t* item) {
 	} else if (menu_item_has_value(item)) {
 		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item));
 		edit_menu_item_value(item);
-		paint_menu_item_value(item);
+		paint_menu_item_value(menu_item_value(item));
 	} else {
 		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item->parent));
 		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));

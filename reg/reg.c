@@ -63,3 +63,40 @@ iql_t reg_valuel(const reg_t* reg)
 	}
 	return val;
 }
+
+void reg_set_valuel(const reg_t* reg, iql_t val)
+{
+	if(reg == NULL) return;
+
+	switch(reg->type){
+	default:
+		break;
+	case REG_TYPE_I8:
+		reg_set_value_i8(reg, (reg_i8_t)val);
+		break;
+	case REG_TYPE_I16:
+		reg_set_value_i16(reg, (reg_i16_t)val);
+		break;
+	case REG_TYPE_I32:
+		reg_set_value_i32(reg, (reg_i32_t)val);
+		break;
+	case REG_TYPE_U8:
+		reg_set_value_u8(reg, (reg_u8_t)val);
+		break;
+	case REG_TYPE_U16:
+		reg_set_value_u16(reg, (reg_u16_t)val);
+		break;
+	case REG_TYPE_U32:
+		reg_set_value_u32(reg, (reg_u32_t)val);
+		break;
+	case REG_TYPE_IQ24:
+		reg_set_value_iq24(reg, (reg_iq24_t)val);
+		break;
+	case REG_TYPE_IQ15:
+		reg_set_value_iq15(reg, (reg_iq15_t)val);
+		break;
+	case REG_TYPE_IQ7:
+		reg_set_value_iq7(reg, (reg_iq7_t)val);
+		break;
+	}
+}

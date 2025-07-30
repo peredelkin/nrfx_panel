@@ -97,6 +97,13 @@ EXTERN size_t reg_data_size(const reg_t* reg);
  */
 EXTERN iql_t reg_valuel(const reg_t* reg);
 
+/**
+ * Записывает значение регистра как TODO: ?
+ * @param reg Регистр.
+ * @param val Значение регистра как TODO: ?
+ */
+EXTERN void reg_set_valuel(const reg_t* reg, iql_t val);
+
 
 //! Получает значение регистра reg приведённое к типу T.
 #define reg_value(reg, T) *((T*)(reg)->data)
@@ -189,6 +196,98 @@ ALWAYS_INLINE static reg_u16_t reg_value_u16(const reg_t* reg)
 ALWAYS_INLINE static reg_u32_t reg_value_u32(const reg_t* reg)
 {
     return reg_value(reg, reg_u32_t);
+}
+
+//===============
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_iq24(const reg_t* reg, reg_iq24_t value)
+{
+    reg_value(reg, reg_iq24_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_iq15(const reg_t* reg, reg_iq15_t value)
+{
+    reg_value(reg, reg_iq15_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_iq7(const reg_t* reg, reg_iq7_t value)
+{
+    reg_value(reg, reg_iq7_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_i8(const reg_t* reg, reg_i8_t value)
+{
+    reg_value(reg, reg_i8_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_i16(const reg_t* reg, reg_i16_t value)
+{
+    reg_value(reg, reg_i16_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_i32(const reg_t* reg, reg_i32_t value)
+{
+    reg_value(reg, reg_i32_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_u8(const reg_t* reg, reg_u8_t value)
+{
+    reg_value(reg, reg_u8_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_u16(const reg_t* reg, reg_u16_t value)
+{
+    reg_value(reg, reg_u16_t) = value;
+}
+
+/**
+ * Записывает значение данных регистра.
+ * @param reg Регистр.
+ * @param value Значение данных.
+ */
+ALWAYS_INLINE static void reg_set_value_u32(const reg_t* reg, reg_u32_t value)
+{
+    reg_value(reg, reg_u32_t) = value;
 }
 
 #endif /* REG_REG_H_ */
