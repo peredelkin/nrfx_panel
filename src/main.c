@@ -474,6 +474,35 @@ extern void menu_panel_init(void);
 char menu_str_val[33];
 int menu_val_tmp;
 
+void menu_reg_value_enum_read(reg_t* reg, menu_value_t* value) {
+	if(nmbs_read_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
+		menu_val_tmp = reg_valuel(reg);
+	} else {
+		menu_val_tmp = ((int)menu_value_enum_current(value));
+	}
+}
+
+void menu_reg_value_enum_change(reg_t* reg, menu_value_t* value, int val) {
+	menu_val_tmp += val;
+
+	if(val > 0) {
+    	if (menu_val_tmp > menu_value_enum_count(value) - 1) {
+    		menu_val_tmp = menu_value_enum_count(value) - 1;
+    	}
+	}
+
+	if(val < 0) {
+    	if (menu_val_tmp < 0) {
+    		menu_val_tmp = 0;
+    	}
+	}
+
+	reg_set_valuel(reg, menu_val_tmp);
+	if(nmbs_write_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
+		menu_value_enum_set_current(value, menu_val_tmp);
+	}
+}
+
 void edit_menu_item_value(menu_item_t* item)
 {
 	menu_value_t* value = menu_item_value(item);
@@ -494,31 +523,14 @@ void edit_menu_item_value(menu_item_t* item)
             break;
         case MENU_VALUE_TYPE_ENUM:
 			if(reg_ptr != NULL) {
-				if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-					menu_val_tmp = reg_valuel(reg_ptr);
-					menu_value_enum_set_current(value, menu_val_tmp);
-				}
+				menu_reg_value_enum_read(reg_ptr, value);
 
 	            if(pca_keys.rise.bit.Pl) {
-	            	menu_val_tmp = (int) menu_value_enum_current(value) + 1;
-	            	if (menu_val_tmp > menu_value_enum_count(value) -1) {
-	            		menu_val_tmp = menu_value_enum_count(value) - 1;
-	            	}
-	            	reg_set_valuel(reg_ptr, menu_val_tmp);
-	            	if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-	            		menu_value_enum_set_current(value, menu_val_tmp);
-	            	}
+	            	menu_reg_value_enum_change(reg_ptr, value, 1);
 	            }
 
 	            if(pca_keys.rise.bit.Mn) {
-	            	menu_val_tmp = (int) menu_value_enum_current(value) - 1;
-	            	if (menu_val_tmp < 0) {
-	            		menu_val_tmp = 0;
-	            	}
-	            	reg_set_valuel(reg_ptr, menu_val_tmp);
-	            	if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-	            		menu_value_enum_set_current(value, menu_val_tmp);
-	            	}
+	            	menu_reg_value_enum_change(reg_ptr, value, -1);
 	            }
 			}
             break;
