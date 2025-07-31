@@ -1,19 +1,10 @@
 #ifndef REG_LIST_DATA_H
 #define REG_LIST_DATA_H
 
-typedef union PACKED _TIC12400_TX_FRAME {
-	reg_i8_t	reg_i8[4];
-	reg_i16_t	reg_i16[2];
-	reg_i32_t	reg_i32;
-	reg_u8_t	reg_u8[4];
-	reg_u16_t	reg_u16[2];
-	reg_u32_t	reg_u32;
-	reg_iq7_t	reg_iq7;
-	reg_iq15_t	reg_iq15;
-	reg_iq24_t	reg_iq24;
-} regs_data_union_t;
 
-static regs_data_union_t regs_data_union;
+
+
+
 
 REGS_BEGIN(REG_ARRAY_NAME)
 
@@ -397,6 +388,13 @@ REG(REG_ID_PANEL_LED_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x
 REG(REG_ID_PANEL_LED_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
 REG(REG_ID_PANEL_LED_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
 REG(REG_ID_PANEL_LED_OUT_DATA, &regs_data_union, REG_TYPE_U16, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
+REG(REG_ID_MODBUS_REG_CAN_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
+REG(REG_ID_MODBUS_REG_CAN_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
+REG(REG_ID_MODBUS_REG_CAN_REG_DEV_ID, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_REG_REG_ID, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_REG_REG_SIZE, &regs_data_union, REG_TYPE_U8, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_REG_REG_DATA, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
 REG(REG_ID_CAN_TIM_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
 REG(REG_ID_CAN_TIM_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
 REG(REG_ID_CAN_TIM_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
