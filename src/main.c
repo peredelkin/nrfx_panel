@@ -220,7 +220,7 @@ nrfx_uarte_config_t uarte_config = {
 		.p_context = &rs485_uart,
 		.hwfc = NRF_UARTE_HWFC_DISABLED,
 		.parity = NRF_UARTE_PARITY_EXCLUDED,
-		.baudrate = NRF_UARTE_BAUDRATE_9600,
+		.baudrate = NRF_UARTE_BAUDRATE_115200,
 		.interrupt_priority = 2,
 };
 
