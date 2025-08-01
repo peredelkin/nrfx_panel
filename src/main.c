@@ -461,11 +461,11 @@ void SysTick_Handler(void)
 //TODO: запихнуть в какую нибудь структуру
 char str_0[34];
 int str_0_count;
-char screen_str_0[16];
+char screen_str_0[35];
 
 char str_1[34];
 int str_1_count;
-char screen_str_1[16];
+char screen_str_1[35];
 
 //TODO: убрать
 extern menu_t panel_menu_0;
@@ -571,19 +571,7 @@ void paint_menu_item_value(menu_value_t* value)
     }
 }
 
-void menu_panel_paint_item(menu_item_t* item) {
-	if (menu_item_parent(item) == NULL) {
-		str_0_count = snprintf(str_0, 17, "Main menu");
-		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
-	} else if (menu_item_has_value(item)) {
-		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item));
-		edit_menu_item_value(item);
-		paint_menu_item_value(menu_item_value(item));
-	} else {
-		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item->parent));
-		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
-	}
-
+void screen_fill() {
 	memset(screen_str_0, *(" "), sizeof(screen_str_0));
 	memset(screen_str_1, *(" "), sizeof(screen_str_1));
 
@@ -596,27 +584,219 @@ void menu_panel_paint_item(menu_item_t* item) {
 	lcd44780_n_puts(&scr_lcd44780, screen_str_1, 16);
 }
 
-void menu_panel_process(void) {
-    menu_item_t* item = menu_current(&panel_menu_0);
+void menu_panel_paint_item(menu_item_t* item) {
+	if (menu_item_parent(item) == NULL) {
+		str_0_count = snprintf(str_0, 17, "Main menu");
+		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
+	} else if (menu_item_has_value(item)) {
+		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item));
+		edit_menu_item_value(item);
+		paint_menu_item_value(menu_item_value(item));
+	} else {
+		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item->parent));
+		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
+	}
+}
 
-    menu_panel_paint_item(item);
+void menu_panel_process(menu_t* menu) {
+    menu_item_t* item = menu_current(menu);
 
     if(pca_keys.rise.bit.Up) {
-    	menu_prev(&panel_menu_0);
+    	menu_prev(menu);
     }
 
     if(pca_keys.rise.bit.Dn) {
-    	menu_next(&panel_menu_0);
+    	menu_next(menu);
     }
 
     if(pca_keys.rise.bit.Ent) {
-    	menu_down(&panel_menu_0);
+    	menu_down(menu);
     }
 
     if(pca_keys.rise.bit.Esc) {
-    	menu_up(&panel_menu_0);
+    	menu_up(menu);
     }
+
+    menu_panel_paint_item(item);
 }
+
+//=================================================================
+
+//! Общие биты статуса.
+enum _E_Base_Control {
+    CONTROL_NONE = 		0,			//!< Ничего.
+    CONTROL_RESET =		(1 << 0),	//!< Сброс.
+    CONTROL_ENABLE =	(1 << 1),	//!< Разрешение работы.
+    CONTROL_START =		(1 << 2),	//!< Запуск.
+    CONTROL_STOP =		(1 << 3),	//!< Останов.
+    CONTROL_USER =		(1 << 4)	//!< Управление модулей.
+};
+
+//! Общие биты статуса.
+enum _E_Base_Status {
+    STATUS_NONE = 0, //!< Ничего.
+    STATUS_READY =		(1 << 0),	//!< Готовность.
+    STATUS_VALID =		(1 << 1),	//!< Правильность выходных данных.
+    STATUS_RUN =		(1 << 2),	//!< Работа.
+    STATUS_ERROR =		(1 << 3),	//!< Ошибка.
+    STATUS_WARNING =	(1 << 4),	//!< Предупреждение.
+    STATUS_USER =		(1 << 5)	//!< Статусы модулей.
+};
+
+//! Перечисление возможных бит управления.
+enum _E_Modbus_To_Can_Control {
+    MODBUS_TO_CAN_CONTROL_NONE = CONTROL_NONE,
+	MODBUS_TO_CAN_CONTROL_RESET = CONTROL_RESET,
+	MODBUS_TO_CAN_CONTROL_ENABLE = CONTROL_ENABLE,
+	MODBUS_TO_CAN_CONTROL_START = CONTROL_START,
+	MODBUS_TO_CAN_CONTROL_STOP =  CONTROL_STOP,
+	MODBUS_TO_CAN_CONTROL_READ = (CONTROL_USER << 0),
+	MODBUS_TO_CAN_CONTROL_WRITE = (CONTROL_USER << 1)
+};
+
+//! Перечисление возможных бит статуса.
+enum _E_Modbus_To_Can_Status {
+    MODBUS_TO_CAN_STATUS_NONE = STATUS_NONE,
+	MODBUS_TO_CAN_STATUS_READY = STATUS_READY,
+	MODBUS_TO_CAN_STATUS_VALID = STATUS_VALID,
+	MODBUS_TO_CAN_STATUS_RUN = STATUS_RUN,
+	MODBUS_TO_CAN_STATUS_ERROR = STATUS_ERROR,
+	MODBUS_TO_CAN_STATUS_WARNING = STATUS_WARNING,
+	MODBUS_TO_CAN_STATUS_READ_DONE = (STATUS_USER << 0),
+	MODBUS_TO_CAN_STATUS_WRITE_DONE = (STATUS_USER << 1)
+};
+
+//! Тип слова управления.
+typedef uint32_t control_t;
+
+//! Тип слова статуса.
+typedef uint32_t status_t;
+
+control_t nmbs_to_can_control;
+status_t nmbs_to_can_status;
+reg_u32_t nmbs_to_can_reg_id;
+reg_u8_t nmbs_to_can_reg_size;
+reg_iq24_t RMS_UA_OUT_VALUE;
+
+//#define REG_ID_RMS_UA_OUT_VALUE 0x225004 /* Рассчитанное RMS. */
+//REG(REG_ID_RMS_UA_OUT_VALUE, &rms_Ua.out_value, REG_TYPE_IQ24, REG_FLAG_NONE, 0x000000) /* Рассчитанное RMS. */
+
+void nmbs_to_can_read_data() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_DATA);
+	if(reg_ptr != NULL) {
+		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			RMS_UA_OUT_VALUE = reg_value_iq24(reg_ptr);
+			str_0_count = snprintf(str_0, 17, "%li", RMS_UA_OUT_VALUE);
+		}
+	}
+}
+
+void nmbs_to_can_read_size() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_SIZE);
+	if(reg_ptr != NULL) {
+		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			nmbs_to_can_reg_size = reg_value_u8(reg_ptr);
+		}
+	}
+
+	if(nmbs_to_can_reg_size == 4) {
+		nmbs_to_can_read_data();
+	} else {
+		str_0_count = snprintf(str_0, 17, "size err");
+	}
+}
+
+void nmbs_to_can_read_id() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	if(reg_ptr != NULL) {
+		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			nmbs_to_can_reg_id = reg_value_u32(reg_ptr);
+		}
+	}
+
+	if(nmbs_to_can_reg_id == ((1 << 24) | 0x225004)) {
+		nmbs_to_can_read_size();
+	} else {
+		str_0_count = snprintf(str_0, 17, "id err");
+	}
+}
+
+void nmbs_to_can_fill_command() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_CONTROL);
+	if(reg_ptr != NULL) {
+		reg_set_value_u32(reg_ptr, (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_READ));
+		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+
+		}
+	}
+}
+
+void nmbs_to_can_fill_size() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_SIZE);
+	if(reg_ptr != NULL) {
+		reg_set_value_u8(reg_ptr, 4);
+		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			nmbs_to_can_fill_command();
+		}
+	}
+}
+
+void nmbs_to_can_fill_id() {
+	reg_t* reg_ptr = NULL;
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	if(reg_ptr != NULL) {
+		reg_set_value_u32(reg_ptr, ((1 << 24) | 0x225004));
+		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			nmbs_to_can_fill_size();
+		}
+	}
+}
+
+void nmbs_to_can_read() {
+	reg_t* reg_ptr = NULL;
+
+	nmbs_to_can_control = 0;
+	nmbs_to_can_status = 0;
+	nmbs_to_can_reg_id = 0;
+	nmbs_to_can_reg_size = 0;
+	RMS_UA_OUT_VALUE = 0;
+
+	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
+	if(reg_ptr != NULL) {
+		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+			nmbs_to_can_status = reg_value_u32(reg_ptr);
+		}
+	}
+
+	//модуль готов
+	if(nmbs_to_can_status & MODBUS_TO_CAN_STATUS_READY) {
+		//модуль выполняет операцию
+		if(nmbs_to_can_status & MODBUS_TO_CAN_STATUS_RUN) {
+			str_0_count = snprintf(str_0, 17, "reading");
+			return;
+			//модль не выолняют операцию
+		} else {
+			//если данные валидны и прочитаны
+			if((nmbs_to_can_status
+					& (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE))
+					== (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE)) {
+				//проверим id, size и прочитаем данные, если id и size совпадают
+				nmbs_to_can_read_id();
+			} else {
+				str_0_count = snprintf(str_0, 17, "none");
+			}
+			//заполним id, size и отправим команду
+			nmbs_to_can_fill_id();
+		}
+	}
+}
+
+//=============================================================
 
 int main(int argc, char *argv[]) {
 	//UICR_init();
@@ -656,18 +836,11 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-//			if(nmbs_read_holding_registers(&nmbs, (uint16_t)(6 << 1), 1, (uint16_t*)leds) == NMBS_ERROR_NONE) {
-//				pca_leds.data.all = leds[0];
-//				nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
-//			}
+			//menu_panel_process(&panel_menu_0);
 
-//			if (nmbs_read_holding_registers(&nmbs, (uint16_t)(addr << 1), 2, data) == NMBS_ERROR_NONE) {
-//				str_1_count = snprintf(str_1, 16, "Data: %0.2f", (*((int32_t*)data))/32768.0f);
-//			} else {
-//				str_1_count = snprintf(str_1, 16, "Error %i", nmbs_err);
-//			}
+			nmbs_to_can_read(); //тест
 
-			menu_panel_process();
+			screen_fill();
 
 			delay_ms(20);
 
