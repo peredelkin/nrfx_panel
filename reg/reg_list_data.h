@@ -15,6 +15,14 @@ typedef union PACKED _TIC12400_TX_FRAME {
 
 static regs_data_union_t regs_data_union;
 
+//modbus to can
+static regs_data_union_t modbus_reg_can_count;
+static regs_data_union_t modbus_reg_can_control;
+static regs_data_union_t modbus_reg_can_status;
+static regs_data_union_t modbus_reg_can_reg_id;
+static regs_data_union_t modbus_reg_can_reg_size;
+static regs_data_union_t modbus_reg_can_reg_data;
+
 REGS_BEGIN(REG_ARRAY_NAME)
 
 REG(REG_ID_DEVICE_TYPE_VALUE, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
@@ -397,12 +405,12 @@ REG(REG_ID_PANEL_LED_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x
 REG(REG_ID_PANEL_LED_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
 REG(REG_ID_PANEL_LED_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
 REG(REG_ID_PANEL_LED_OUT_DATA, &regs_data_union, REG_TYPE_U16, REG_FLAG_NONE, 0x000000) /*  */
-REG(REG_ID_MODBUS_REG_CAN_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
-REG(REG_ID_MODBUS_REG_CAN_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
-REG(REG_ID_MODBUS_REG_CAN_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
-REG(REG_ID_MODBUS_REG_CAN_REG_ID, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
-REG(REG_ID_MODBUS_REG_CAN_REG_SIZE, &regs_data_union, REG_TYPE_U8, REG_FLAG_NONE, 0x000000) /*  */
-REG(REG_ID_MODBUS_REG_CAN_REG_DATA, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_COUNT, &modbus_reg_can_count, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
+REG(REG_ID_MODBUS_REG_CAN_CONTROL, &modbus_reg_can_control, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
+REG(REG_ID_MODBUS_REG_CAN_STATUS, &modbus_reg_can_status, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
+REG(REG_ID_MODBUS_REG_CAN_REG_ID, &modbus_reg_can_reg_id, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_REG_SIZE, &modbus_reg_can_reg_size, REG_TYPE_U8, REG_FLAG_NONE, 0x000000) /*  */
+REG(REG_ID_MODBUS_REG_CAN_REG_DATA, &modbus_reg_can_reg_data, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
 REG(REG_ID_CAN_TIM_COUNT, &regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
 REG(REG_ID_CAN_TIM_CONTROL, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
 REG(REG_ID_CAN_TIM_STATUS, &regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */

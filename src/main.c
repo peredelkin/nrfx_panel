@@ -672,128 +672,161 @@ typedef uint32_t control_t;
 //! Тип слова статуса.
 typedef uint32_t status_t;
 
-control_t nmbs_to_can_control;
-status_t nmbs_to_can_status;
-reg_u32_t nmbs_to_can_reg_id;
-reg_u8_t nmbs_to_can_reg_size;
-reg_iq24_t RMS_UA_OUT_VALUE;
-
 //#define REG_ID_RMS_UA_OUT_VALUE 0x225004 /* Рассчитанное RMS. */
 //REG(REG_ID_RMS_UA_OUT_VALUE, &rms_Ua.out_value, REG_TYPE_IQ24, REG_FLAG_NONE, 0x000000) /* Рассчитанное RMS. */
 
-void nmbs_to_can_read_data() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_DATA);
-	if(reg_ptr != NULL) {
-		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			RMS_UA_OUT_VALUE = reg_value_iq24(reg_ptr);
-			str_0_count = snprintf(str_0, 17, "%li", RMS_UA_OUT_VALUE);
-		}
+err_t nmbs_to_can_read_id_size_data() {
+	//найдем регистр индетификатора
+	reg_t* id_reg = reg_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	if(id_reg == NULL) {
+		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
+
+	//прочитамем регистры id, size и data
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, id_reg, 3);
+	if (nmbs_err != NMBS_ERROR_NONE) {
+		return E_MODBUS_TO_CAN_NMBS_ERROR;
+	}
+
+	return E_NO_ERROR;
 }
 
-void nmbs_to_can_read_size() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_SIZE);
-	if(reg_ptr != NULL) {
-		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			nmbs_to_can_reg_size = reg_value_u8(reg_ptr);
-		}
+err_t nmbs_to_can_send_id_size_data() {
+	//найдем регистр id
+	reg_t* id_reg = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	if(id_reg == NULL) {
+		return E_MODBUS_TO_CAN_NULL_POINTER;
+	}
+	//отправим регистры id, size и data
+	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, id_reg, 3);
+	if (nmbs_err != NMBS_ERROR_NONE) {
+		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
 
-	if(nmbs_to_can_reg_size == 4) {
-		nmbs_to_can_read_data();
-	} else {
-		str_0_count = snprintf(str_0, 17, "size err");
-	}
+	return E_NO_ERROR;
 }
 
-void nmbs_to_can_read_id() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
-	if(reg_ptr != NULL) {
-		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			nmbs_to_can_reg_id = reg_value_u32(reg_ptr);
-		}
+err_t nmbs_to_can_send_command() {
+	//найдем регистр id
+	reg_t* control = regs_find(REG_ID_MODBUS_REG_CAN_CONTROL);
+	if(control == NULL) {
+		return E_MODBUS_TO_CAN_NULL_POINTER;
+	}
+	//отправим регистр control
+	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, control, 1);
+	if (nmbs_err != NMBS_ERROR_NONE) {
+		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
 
-	if(nmbs_to_can_reg_id == ((1 << 24) | 0x225004)) {
-		nmbs_to_can_read_size();
-	} else {
-		str_0_count = snprintf(str_0, 17, "id err");
-	}
+	return E_NO_ERROR;
 }
 
-void nmbs_to_can_fill_command() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_CONTROL);
-	if(reg_ptr != NULL) {
-		reg_set_value_u32(reg_ptr, (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_READ));
-		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+err_t nmbs_to_can_read_cmd(uint32_t id, uint8_t size) {
+	err_t err = E_NO_ERROR;
 
-		}
-	}
+	//запишем id
+	modbus_reg_can_reg_id.reg_u32 =  id;
+	//запишем size
+	modbus_reg_can_reg_size.reg_u8 =  size;
+	//запишем data
+	modbus_reg_can_reg_data.reg_u32 =  0;
+	//запишем control
+	modbus_reg_can_control.reg_u32 = (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_READ);
+
+	err = nmbs_to_can_send_id_size_data();
+
+	if(err != E_NO_ERROR) return err;
+
+	return nmbs_to_can_send_command();
 }
 
-void nmbs_to_can_fill_size() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_SIZE);
-	if(reg_ptr != NULL) {
-		reg_set_value_u8(reg_ptr, 4);
-		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			nmbs_to_can_fill_command();
-		}
-	}
+err_t nmbs_to_can_write_cmd(uint32_t id, uint8_t size, uint32_t data) {
+	err_t err = E_NO_ERROR;
+
+	//запишем id
+	modbus_reg_can_reg_id.reg_u32 =  id;
+	//запишем size
+	modbus_reg_can_reg_size.reg_u8 =  size;
+	//запишем data
+	modbus_reg_can_reg_data.reg_u32 =  data;
+	//запишем control
+	modbus_reg_can_control.reg_u32 = (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_WRITE);
+
+	err = nmbs_to_can_send_id_size_data();
+
+	if(err != E_NO_ERROR) return err;
+
+	return nmbs_to_can_send_command();
 }
 
-void nmbs_to_can_fill_id() {
-	reg_t* reg_ptr = NULL;
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
-	if(reg_ptr != NULL) {
-		reg_set_value_u32(reg_ptr, ((1 << 24) | 0x225004));
-		if(nmbs_write_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			nmbs_to_can_fill_size();
-		}
-	}
-}
-
-void nmbs_to_can_read() {
-	reg_t* reg_ptr = NULL;
-
-	nmbs_to_can_control = 0;
-	nmbs_to_can_status = 0;
-	nmbs_to_can_reg_id = 0;
-	nmbs_to_can_reg_size = 0;
-	RMS_UA_OUT_VALUE = 0;
-
-	reg_ptr = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
-	if(reg_ptr != NULL) {
-		if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
-			nmbs_to_can_status = reg_value_u32(reg_ptr);
-		}
+err_t nmbs_to_can_status_ready_read() {
+	//найдем регистр статуса
+	reg_t* status_reg = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
+	if(status_reg == NULL) {
+		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 
-	//модуль готов
-	if(nmbs_to_can_status & MODBUS_TO_CAN_STATUS_READY) {
-		//модуль выполняет операцию
-		if(nmbs_to_can_status & MODBUS_TO_CAN_STATUS_RUN) {
-			str_0_count = snprintf(str_0, 17, "reading");
-			return;
-			//модль не выолняют операцию
+	//прочитаем регистр статуса
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, status_reg, 1);
+	if(nmbs_err != NMBS_ERROR_NONE) {
+		return E_MODBUS_TO_CAN_NMBS_ERROR;
+	}
+
+	//прочитаем статус
+	uint32_t status = reg_value_u32(status_reg);
+
+	if(status & MODBUS_TO_CAN_STATUS_READY) {
+		if(status & MODBUS_TO_CAN_STATUS_RUN) {
+			return E_MODBUS_TO_CAN_IN_PROGRESS;
 		} else {
-			//если данные валидны и прочитаны
-			if((nmbs_to_can_status
+			if((status
 					& (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE))
 					== (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE)) {
-				//проверим id, size и прочитаем данные, если id и size совпадают
-				nmbs_to_can_read_id();
+				return E_MODBUS_TO_CAN_DATA_READY;
 			} else {
-				str_0_count = snprintf(str_0, 17, "none");
+				return E_MODBUS_TO_CAN_DATA_NOT_READY;
 			}
-			//заполним id, size и отправим команду
-			nmbs_to_can_fill_id();
 		}
+	} else {
+		return E_MODBUS_TO_CAN_MODULE_NOT_READY;
 	}
+
+	return E_NOT_IMPLEMENTED;
+}
+
+err_t nmbs_to_can_status_write_done() {
+	//найдем регистр статуса
+	reg_t* status_reg = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
+	if(status_reg == NULL) {
+		return E_MODBUS_TO_CAN_NULL_POINTER;
+	}
+
+	//прочитаем регистр статуса
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, status_reg, 1);
+	if(nmbs_err != NMBS_ERROR_NONE) {
+		return E_MODBUS_TO_CAN_NMBS_ERROR;
+	}
+
+	//прочитаем статус
+	uint32_t status = reg_value_u32(status_reg);
+
+	if(status & MODBUS_TO_CAN_STATUS_READY) {
+		if(status & MODBUS_TO_CAN_STATUS_RUN) {
+			return E_MODBUS_TO_CAN_IN_PROGRESS;
+		} else {
+			if((status
+					& (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE))
+					== (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE)) {
+				return E_MODBUS_TO_CAN_DATA_WRITTEN;
+			} else {
+				return E_MODBUS_TO_CAN_DATA_NOT_WRITTEN;
+			}
+		}
+	} else {
+		return E_MODBUS_TO_CAN_MODULE_NOT_READY;
+	}
+
+	return E_NOT_IMPLEMENTED;
 }
 
 //=============================================================
