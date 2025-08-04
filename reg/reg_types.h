@@ -50,5 +50,17 @@ typedef const char* reg_str_t;
 //! mem.
 typedef void* reg_mem_t;
 
+typedef union PACKED _REG_DATA_UNION {
+	reg_i8_t	reg_i8[4];
+	reg_i16_t	reg_i16[2];
+	reg_i32_t	reg_i32;
+	reg_u8_t	reg_u8[4];
+	reg_u16_t	reg_u16[2];
+	reg_u32_t	reg_u32;
+	reg_iq7_t	reg_iq7;
+	reg_iq15_t	reg_iq15;
+	reg_iq24_t	reg_iq24;
+} regs_data_union_t;
+
 
 #endif /* BASE_REG_TYPES_H */

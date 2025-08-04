@@ -20,6 +20,14 @@
 #include "reg_ids.h"
 #include "buf_reg.h"
 
+//modbus to can
+regs_data_union_t modbus_reg_can_count;
+regs_data_union_t modbus_reg_can_control;
+regs_data_union_t modbus_reg_can_status;
+regs_data_union_t modbus_reg_can_reg_id;
+regs_data_union_t modbus_reg_can_reg_size;
+regs_data_union_t modbus_reg_can_reg_data;
+
 enum {
 	MODBUS_RTU_CUSTOM_FUNC_REG_READ = 0x64,
 	MODBUS_RTU_CUSTOM_FUNC_REG_WRITE,
@@ -44,8 +52,18 @@ uint8_t nmbs_reg_request_data[NMBS_PDU_SIZE_MAX];
 uint8_t nmbs_reg_response_data[NMBS_PDU_SIZE_MAX];
 
 //TODO: причесать этот колхоз
-nmbs_error nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
-	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
+err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
+	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
+
+	reg_t* reg_ptr = reg;
+
+	//вычислим ожидаемый размер данных
+	size_t response_data_size = 0;
+	for(int reg_count = 0; reg_count < count; reg_count++) {
+		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
+		response_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
+		reg_ptr = regs_next(reg_ptr);
+	}
 
 	nmbs_error error = NMBS_ERROR_NONE;
 
@@ -59,44 +77,49 @@ nmbs_error nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	//отправим запрос
 	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, nmbs_reg_request_data, sizeof(nmbs_reg_request));
 
-	if(error != NMBS_ERROR_NONE) return error;
-
-	//вычислим ожидаемый размер данных
-	size_t request_data_size = 4 + 1 + 1 + reg_data_size(reg);
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
 	//получим данные
-	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, request_data_size);
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, response_data_size);
 
-	if(error != NMBS_ERROR_NONE) return error;
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
+	reg_ptr = NULL;
 	size_t index = 0;
 	reg_id_t p_id = 0;
 	reg_type_t p_type = 0;
 	size_t p_size = 0;
 	uint8_t p_data[4];
 
-	//прочитаем данные
-	int reg_getted = buf_get_reg_atomic(nmbs_reg_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, 4);
-	if(reg_getted < 0) return NMBS_ERROR_INVALID_ARGUMENT;
+	for(int reg_count = 0; reg_count < count; reg_count++) {
+		//прочитаем данные
+		int reg_getted = buf_get_reg_atomic(nmbs_reg_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, sizeof(p_data));
+		if(reg_getted < 0) return E_MODULE_REG_INVALID_SIZE;
 
-	//сравним на соответствие запросу
-	if((reg->id == p_id) && (reg->type == p_type) && (reg_data_size(reg) == p_size)) {
-		memcpy(reg->data, p_data, p_size);
-	} else {
-		return NMBS_ERROR_INVALID_RESPONSE;
+		reg_ptr = regs_find(p_id);
+		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
+
+		//сравним тип и размер
+		if((reg_ptr->type == p_type) && (reg_data_size(reg_ptr) == p_size)) {
+			memcpy(reg_ptr->data, p_data, p_size);
+		} else {
+			return E_MODULE_REG_INVALID_SIZE;
+		}
 	}
 
-	return error;
+	return E_NO_ERROR;
 }
 
 //TODO: причесать этот колхоз
-nmbs_error nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
+err_t nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
+
+	reg_t* reg_ptr = reg;
 
 	nmbs_error error = NMBS_ERROR_NONE;
 
 	//заполним заголовок запроса
-	nmbs_reg_request.id = reg->id;
+	nmbs_reg_request.id = reg_ptr->id;
 	nmbs_reg_request.count = count;
 
 	//скопируем заголовок запроса
@@ -105,11 +128,21 @@ nmbs_error nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	//получим смещение для заполнения запроса данными
 	size_t index = sizeof(nmbs_reg_request);
 
-	//заполним запрос данными
-	int reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg);
+	//
+	int reg_putted = 0;
+
+	//вычислим ожидаемый размер данных
+	size_t request_data_size = sizeof(nmbs_reg_request);
+	for(int reg_count = 0; reg_count < count; reg_count++) {
+		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
+		reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg_ptr);
+		if(reg_putted < 0) return E_MODULE_REG_INVALID_SIZE;
+		request_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
+		reg_ptr = regs_next(reg_ptr);
+	}
 
 	//отправим запрос
-	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_WRITE, nmbs_reg_request_data, sizeof(nmbs_reg_request) + reg_putted);
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_WRITE, nmbs_reg_request_data, request_data_size);
 
 	if(error != NMBS_ERROR_NONE) return error;
 
@@ -677,7 +710,7 @@ typedef uint32_t status_t;
 
 err_t nmbs_to_can_read_id_size_data() {
 	//найдем регистр индетификатора
-	reg_t* id_reg = reg_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	reg_t* id_reg = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
 	if(id_reg == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
@@ -727,7 +760,7 @@ err_t nmbs_to_can_read_cmd(uint32_t id, uint8_t size) {
 	//запишем id
 	modbus_reg_can_reg_id.reg_u32 =  id;
 	//запишем size
-	modbus_reg_can_reg_size.reg_u8 =  size;
+	modbus_reg_can_reg_size.reg_u8[0] =  size;
 	//запишем data
 	modbus_reg_can_reg_data.reg_u32 =  0;
 	//запишем control
@@ -746,7 +779,7 @@ err_t nmbs_to_can_write_cmd(uint32_t id, uint8_t size, uint32_t data) {
 	//запишем id
 	modbus_reg_can_reg_id.reg_u32 =  id;
 	//запишем size
-	modbus_reg_can_reg_size.reg_u8 =  size;
+	modbus_reg_can_reg_size.reg_u8[0] =  size;
 	//запишем data
 	modbus_reg_can_reg_data.reg_u32 =  data;
 	//запишем control
@@ -863,7 +896,7 @@ int main(int argc, char *argv[]) {
 
 			reg_ptr = regs_find(REG_ID_PANEL_LED_OUT_DATA);
 			if(reg_ptr != NULL) {
-				if(nmbs_read_regs(&nmbs, reg_ptr, 1) == NMBS_ERROR_NONE) {
+				if(nmbs_read_regs(&nmbs, reg_ptr, 1) == E_NO_ERROR) {
 					pca_leds.data.all = reg_value_u16(reg_ptr);
 					nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
 				}
@@ -871,7 +904,7 @@ int main(int argc, char *argv[]) {
 
 			//menu_panel_process(&panel_menu_0);
 
-			nmbs_to_can_read(); //тест
+			//nmbs_to_can_read(); //тест
 
 			screen_fill();
 
