@@ -58,7 +58,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	reg_t* reg_ptr = reg;
 
 	//вычислим ожидаемый размер данных
-	size_t response_data_size = 0;
+	size_t response_data_size = sizeof(nmbs_reg_response);
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
 		response_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
@@ -84,8 +84,13 @@ err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 
 	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
+	//прочитаем заголовок
+	memcpy(nmbs_reg_response_data, &nmbs_reg_response, sizeof(nmbs_reg_response));
+
+	//TODO: проверить ответ!
+
 	reg_ptr = NULL;
-	size_t index = 0;
+	size_t index = sizeof(nmbs_reg_response);
 	reg_id_t p_id = 0;
 	reg_type_t p_type = 0;
 	size_t p_size = 0;
@@ -131,13 +136,13 @@ err_t nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	//
 	int reg_putted = 0;
 
-	//вычислим ожидаемый размер данных
+	//вычислим размер данных
 	size_t request_data_size = sizeof(nmbs_reg_request);
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
 		reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg_ptr);
 		if(reg_putted < 0) return E_MODULE_REG_INVALID_SIZE;
-		request_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
+		request_data_size += reg_putted;
 		reg_ptr = regs_next(reg_ptr);
 	}
 
@@ -148,6 +153,8 @@ err_t nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 
 	//получим данные
 	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, sizeof(nmbs_reg_response));
+
+	//TODO: проверить ответ!
 
 	if(error != NMBS_ERROR_NONE) return error;
 
@@ -862,6 +869,21 @@ err_t nmbs_to_can_status_write_done() {
 	return E_NOT_IMPLEMENTED;
 }
 
+void nmbs_to_can_read() {
+	err_t err = nmbs_to_can_status_ready_read();
+	switch(err) {
+	case E_MODBUS_TO_CAN_DATA_READY:
+		nmbs_to_can_read_id_size_data();
+		str_0_count = snprintf(str_0, 17, "%lu" , modbus_reg_can_reg_data.reg_u32);
+		//no break
+	case E_MODBUS_TO_CAN_DATA_NOT_READY:
+		nmbs_to_can_read_cmd(((1 << 24) | 0x225004), 4);
+		break;
+	default:
+		break;
+	}
+}
+
 //=============================================================
 
 int main(int argc, char *argv[]) {
@@ -904,7 +926,7 @@ int main(int argc, char *argv[]) {
 
 			//menu_panel_process(&panel_menu_0);
 
-			//nmbs_to_can_read(); //тест
+			nmbs_to_can_read(); //тест
 
 			screen_fill();
 
