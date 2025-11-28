@@ -17,7 +17,7 @@
 #include "nanomodbus.h"
 #include "menu.h"
 #include "regs.h"
-#include "reg_ids.h"
+#include "reg_list.h"
 #include "buf_reg.h"
 
 //modbus to can
@@ -52,7 +52,7 @@ uint8_t nmbs_reg_request_data[NMBS_PDU_SIZE_MAX];
 uint8_t nmbs_reg_response_data[NMBS_PDU_SIZE_MAX];
 
 //TODO: причесать этот колхоз
-err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
+err_t nmbs_read_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t count) {
 	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
 
 	reg_t* reg_ptr = reg;
@@ -62,7 +62,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
 		response_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
-		reg_ptr = regs_next(reg_ptr);
+		reg_ptr = regs_next(list, reg_ptr);
 	}
 
 	nmbs_error error = NMBS_ERROR_NONE;
@@ -101,7 +101,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 		int reg_getted = buf_get_reg_atomic(nmbs_reg_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, sizeof(p_data));
 		if(reg_getted < 0) return E_MODULE_REG_INVALID_SIZE;
 
-		reg_ptr = regs_find(p_id);
+		reg_ptr = regs_find(list, p_id);
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
 
 		//сравним тип и размер
@@ -116,7 +116,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 }
 
 //TODO: причесать этот колхоз
-err_t nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
+err_t nmbs_write_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t count) {
 	if((nmbs == NULL) || (reg == NULL)) return NMBS_ERROR_INVALID_ARGUMENT;
 
 	reg_t* reg_ptr = reg;
@@ -143,7 +143,7 @@ err_t nmbs_write_regs(nmbs_t* nmbs, reg_t* reg, uint8_t count) {
 		reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg_ptr);
 		if(reg_putted < 0) return E_MODULE_REG_INVALID_SIZE;
 		request_data_size += reg_putted;
-		reg_ptr = regs_next(reg_ptr);
+		reg_ptr = regs_next(list, reg_ptr);
 	}
 
 	//отправим запрос
@@ -523,8 +523,8 @@ void menu_reg_value_enum_clamp(int* val, int max) {
 	}
 }
 
-void menu_reg_value_enum_read(reg_t* reg, menu_value_t* value) {
-	if(nmbs_read_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
+void menu_reg_value_enum_read(const reg_list_t* list, reg_t* reg, menu_value_t* value) {
+	if(nmbs_read_regs(&nmbs, list, reg, 1) == NMBS_ERROR_NONE) {
 
 		int tmp_val = reg_valuel(reg);
 		int val_max = ((int)menu_value_enum_count(value)) - 1;
@@ -535,7 +535,7 @@ void menu_reg_value_enum_read(reg_t* reg, menu_value_t* value) {
 	}
 }
 
-void menu_reg_value_enum_change(reg_t* reg, menu_value_t* value, int val) {
+void menu_reg_value_enum_change(const reg_list_t* list, reg_t* reg, menu_value_t* value, int val) {
 	int tmp_val = ((int)menu_value_enum_current(value)) + val;
 	int val_max = ((int)menu_value_enum_count(value)) - 1;
 
@@ -543,7 +543,7 @@ void menu_reg_value_enum_change(reg_t* reg, menu_value_t* value, int val) {
 
 	reg_set_valuel(reg, tmp_val);
 
-	if(nmbs_write_regs(&nmbs, reg, 1) == NMBS_ERROR_NONE) {
+	if(nmbs_write_regs(&nmbs, list, reg, 1) == NMBS_ERROR_NONE) {
 		//menu_value_enum_set_current(value, tmp_val);
 	}
 }
@@ -554,7 +554,7 @@ void edit_menu_item_value(menu_item_t* item)
 
     if(value == NULL) return;
 
-    reg_t* reg_ptr = regs_find(item->id);
+    reg_t* reg_ptr = regs_find(&reg_list[0],item->id);
 
     switch(menu_value_type(value)){
         case MENU_VALUE_TYPE_STRING:
@@ -568,14 +568,14 @@ void edit_menu_item_value(menu_item_t* item)
             break;
         case MENU_VALUE_TYPE_ENUM:
 			if(reg_ptr != NULL) {
-				menu_reg_value_enum_read(reg_ptr, value);
+				menu_reg_value_enum_read(&reg_list[0], reg_ptr, value);
 
 	            if(pca_keys.rise.bit.Pl) {
-	            	menu_reg_value_enum_change(reg_ptr, value, 1);
+	            	menu_reg_value_enum_change(&reg_list[0], reg_ptr, value, 1);
 	            }
 
 	            if(pca_keys.rise.bit.Mn) {
-	            	menu_reg_value_enum_change(reg_ptr, value, -1);
+	            	menu_reg_value_enum_change(&reg_list[0], reg_ptr, value, -1);
 	            }
 			}
             break;
@@ -717,13 +717,13 @@ typedef uint32_t status_t;
 
 err_t nmbs_to_can_read_id_size_data() {
 	//найдем регистр индетификатора
-	reg_t* id_reg = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	reg_t* id_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_REG_ID);
 	if(id_reg == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 
 	//прочитамем регистры id, size и data
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, id_reg, 3);
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], id_reg, 3);
 	if (nmbs_err != NMBS_ERROR_NONE) {
 		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
@@ -733,12 +733,12 @@ err_t nmbs_to_can_read_id_size_data() {
 
 err_t nmbs_to_can_send_id_size_data() {
 	//найдем регистр id
-	reg_t* id_reg = regs_find(REG_ID_MODBUS_REG_CAN_REG_ID);
+	reg_t* id_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_REG_ID);
 	if(id_reg == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 	//отправим регистры id, size и data
-	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, id_reg, 3);
+	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, &reg_list[0], id_reg, 3);
 	if (nmbs_err != NMBS_ERROR_NONE) {
 		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
@@ -748,12 +748,12 @@ err_t nmbs_to_can_send_id_size_data() {
 
 err_t nmbs_to_can_send_command() {
 	//найдем регистр id
-	reg_t* control = regs_find(REG_ID_MODBUS_REG_CAN_CONTROL);
+	reg_t* control = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_CONTROL);
 	if(control == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 	//отправим регистр control
-	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, control, 1);
+	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, &reg_list[0], control, 1);
 	if (nmbs_err != NMBS_ERROR_NONE) {
 		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
@@ -801,13 +801,13 @@ err_t nmbs_to_can_write_cmd(uint32_t id, uint8_t size, uint32_t data) {
 
 err_t nmbs_to_can_status_ready_read() {
 	//найдем регистр статуса
-	reg_t* status_reg = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
+	reg_t* status_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_STATUS);
 	if(status_reg == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 
 	//прочитаем регистр статуса
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, status_reg, 1);
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], status_reg, 1);
 	if(nmbs_err != NMBS_ERROR_NONE) {
 		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
@@ -836,13 +836,13 @@ err_t nmbs_to_can_status_ready_read() {
 
 err_t nmbs_to_can_status_write_done() {
 	//найдем регистр статуса
-	reg_t* status_reg = regs_find(REG_ID_MODBUS_REG_CAN_STATUS);
+	reg_t* status_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_STATUS);
 	if(status_reg == NULL) {
 		return E_MODBUS_TO_CAN_NULL_POINTER;
 	}
 
 	//прочитаем регистр статуса
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, status_reg, 1);
+	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], status_reg, 1);
 	if(nmbs_err != NMBS_ERROR_NONE) {
 		return E_MODBUS_TO_CAN_NMBS_ERROR;
 	}
@@ -916,9 +916,9 @@ int main(int argc, char *argv[]) {
 			pca_keys.fall.all = pca_keys.old.all & ~pca_keys.current.all;
 			pca_keys.old.all = pca_keys.current.all;
 
-			reg_ptr = regs_find(REG_ID_PANEL_LED_OUT_DATA);
+			reg_ptr = regs_find(&reg_list[0], APP_REG_ID_PANEL_LED_OUT_DATA);
 			if(reg_ptr != NULL) {
-				if(nmbs_read_regs(&nmbs, reg_ptr, 1) == E_NO_ERROR) {
+				if(nmbs_read_regs(&nmbs, &reg_list[0], reg_ptr, 1) == E_NO_ERROR) {
 					pca_leds.data.all = reg_value_u16(reg_ptr);
 					nrfx_pca9539_write(&nrf_twim, 116, (uint8_t*) &pca_leds, 1);
 				}

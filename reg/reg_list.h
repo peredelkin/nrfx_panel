@@ -2,7 +2,8 @@
 #define REG_LIST_H
 
 #include "reg.h"
-#include "reg_ids.h"
+#include "app/app_reg_ids.h"
+#include "mc/mc_reg_ids.h"
 
 
 /*
@@ -32,9 +33,12 @@
 #define REGS_COUNT_VALUE(NAME) (sizeof(NAME)/sizeof(NAME[0]))
 
 
-#define REG_ARRAY_NAME regs
-#include "reg_list_data.h"
-#define REGS_COUNT REGS_COUNT_VALUE(REG_ARRAY_NAME)
+#define APP_REG_ARRAY_NAME app_regs
+#define MC_REG_ARRAY_NAME mc_regs
+#include "app/app_reg_list_data.h"
+#include "mc/mc_reg_list_data.h"
+#define APP_REGS_COUNT REGS_COUNT_VALUE(APP_REG_ARRAY_NAME)
+#define MC_REGS_COUNT REGS_COUNT_VALUE(MC_REG_ARRAY_NAME)
 
 
 #endif /* REG_LIST_H */
