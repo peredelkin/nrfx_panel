@@ -31,25 +31,27 @@ regs_data_union_t modbus_reg_can_reg_data;
 enum {
 	MODBUS_RTU_CUSTOM_FUNC_REG_READ = 0x64,
 	MODBUS_RTU_CUSTOM_FUNC_REG_WRITE,
+	MODBUS_RTU_CUSTOM_FUNC_CAN_READ,
+	MODBUS_RTU_CUSTOM_FUNC_CAN_WRITE
 };
 
 #pragma pack(push, 1)
 struct {
 		reg_id_t id;
 		uint8_t count;
-	} nmbs_reg_request;
+	} modbus_regs_request;
 #pragma pack(pop)
 
 #pragma pack(push, 1)
 struct {
 		reg_id_t id;
 		uint8_t count;
-	} nmbs_reg_response;
+	} modbus_regs_response;
 #pragma pack(pop)
 
 #define NMBS_PDU_SIZE_MAX 252
-uint8_t nmbs_reg_request_data[NMBS_PDU_SIZE_MAX];
-uint8_t nmbs_reg_response_data[NMBS_PDU_SIZE_MAX];
+uint8_t nmbs_request_data[NMBS_PDU_SIZE_MAX];
+uint8_t nmbs_response_data[NMBS_PDU_SIZE_MAX];
 
 //TODO: причесать этот колхоз
 err_t nmbs_read_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t count) {
@@ -58,7 +60,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t c
 	reg_t* reg_ptr = reg;
 
 	//вычислим ожидаемый размер данных
-	size_t response_data_size = sizeof(nmbs_reg_response);
+	size_t response_data_size = sizeof(modbus_regs_response);
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
 		response_data_size += 4 + 1 + 1 + reg_data_size(reg_ptr);
@@ -68,29 +70,29 @@ err_t nmbs_read_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t c
 	nmbs_error error = NMBS_ERROR_NONE;
 
 	//заполним запрос
-	nmbs_reg_request.id = reg->id;
-	nmbs_reg_request.count = count;
+	modbus_regs_request.id = reg->id;
+	modbus_regs_request.count = count;
 
 	//скопируем запрос
-	memcpy(nmbs_reg_request_data, &nmbs_reg_request, sizeof(nmbs_reg_request));
+	memcpy(nmbs_request_data, &modbus_regs_request, sizeof(modbus_regs_request));
 
 	//отправим запрос
-	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, nmbs_reg_request_data, sizeof(nmbs_reg_request));
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_READ, nmbs_request_data, sizeof(modbus_regs_request));
 
 	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
 	//получим данные
-	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, response_data_size);
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, response_data_size);
 
 	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
 	//прочитаем заголовок
-	memcpy(nmbs_reg_response_data, &nmbs_reg_response, sizeof(nmbs_reg_response));
+	memcpy(&modbus_regs_response, nmbs_response_data, sizeof(modbus_regs_response));
 
 	//TODO: проверить ответ!
 
 	reg_ptr = NULL;
-	size_t index = sizeof(nmbs_reg_response);
+	size_t index = sizeof(modbus_regs_response);
 	reg_id_t p_id = 0;
 	reg_type_t p_type = 0;
 	size_t p_size = 0;
@@ -98,7 +100,7 @@ err_t nmbs_read_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t c
 
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		//прочитаем данные
-		int reg_getted = buf_get_reg_atomic(nmbs_reg_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, sizeof(p_data));
+		int reg_getted = buf_get_reg_atomic(nmbs_response_data, &index, NMBS_PDU_SIZE_MAX, &p_id, &p_type, &p_size, p_data, sizeof(p_data));
 		if(reg_getted < 0) return E_MODULE_REG_INVALID_SIZE;
 
 		reg_ptr = regs_find(list, p_id);
@@ -124,35 +126,35 @@ err_t nmbs_write_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t 
 	nmbs_error error = NMBS_ERROR_NONE;
 
 	//заполним заголовок запроса
-	nmbs_reg_request.id = reg_ptr->id;
-	nmbs_reg_request.count = count;
+	modbus_regs_request.id = reg_ptr->id;
+	modbus_regs_request.count = count;
 
 	//скопируем заголовок запроса
-	memcpy(nmbs_reg_request_data, &nmbs_reg_request, sizeof(nmbs_reg_request));
+	memcpy(nmbs_request_data, &modbus_regs_request, sizeof(modbus_regs_request));
 
 	//получим смещение для заполнения запроса данными
-	size_t index = sizeof(nmbs_reg_request);
+	size_t index = sizeof(modbus_regs_request);
 
 	//
 	int reg_putted = 0;
 
 	//вычислим размер данных
-	size_t request_data_size = sizeof(nmbs_reg_request);
+	size_t request_data_size = sizeof(modbus_regs_request);
 	for(int reg_count = 0; reg_count < count; reg_count++) {
 		if(reg_ptr == NULL) return E_MODBUS_REG_NULL_POINTER;
-		reg_putted = buf_put_reg_atomic(nmbs_reg_request_data, &index, NMBS_PDU_SIZE_MAX, reg_ptr);
+		reg_putted = buf_put_reg_atomic(nmbs_request_data, &index, NMBS_PDU_SIZE_MAX, reg_ptr);
 		if(reg_putted < 0) return E_MODULE_REG_INVALID_SIZE;
 		request_data_size += reg_putted;
 		reg_ptr = regs_next(list, reg_ptr);
 	}
 
 	//отправим запрос
-	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_WRITE, nmbs_reg_request_data, request_data_size);
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_REG_WRITE, nmbs_request_data, request_data_size);
 
 	if(error != NMBS_ERROR_NONE) return error;
 
 	//получим данные
-	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_reg_response_data, sizeof(nmbs_reg_response));
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, sizeof(modbus_regs_response));
 
 	//TODO: проверить ответ!
 
@@ -160,7 +162,6 @@ err_t nmbs_write_regs(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg, uint8_t 
 
 	return error;
 }
-
 
 lcd44780_t scr_lcd44780;
 
@@ -661,17 +662,6 @@ void menu_panel_process(menu_t* menu) {
 }
 
 //=================================================================
-
-//! Общие биты статуса.
-enum _E_Base_Control {
-    CONTROL_NONE = 		0,			//!< Ничего.
-    CONTROL_RESET =		(1 << 0),	//!< Сброс.
-    CONTROL_ENABLE =	(1 << 1),	//!< Разрешение работы.
-    CONTROL_START =		(1 << 2),	//!< Запуск.
-    CONTROL_STOP =		(1 << 3),	//!< Останов.
-    CONTROL_USER =		(1 << 4)	//!< Управление модулей.
-};
-
 //! Общие биты статуса.
 enum _E_Base_Status {
     STATUS_NONE = 0, //!< Ничего.
@@ -681,17 +671,6 @@ enum _E_Base_Status {
     STATUS_ERROR =		(1 << 3),	//!< Ошибка.
     STATUS_WARNING =	(1 << 4),	//!< Предупреждение.
     STATUS_USER =		(1 << 5)	//!< Статусы модулей.
-};
-
-//! Перечисление возможных бит управления.
-enum _E_Modbus_To_Can_Control {
-    MODBUS_TO_CAN_CONTROL_NONE = CONTROL_NONE,
-	MODBUS_TO_CAN_CONTROL_RESET = CONTROL_RESET,
-	MODBUS_TO_CAN_CONTROL_ENABLE = CONTROL_ENABLE,
-	MODBUS_TO_CAN_CONTROL_START = CONTROL_START,
-	MODBUS_TO_CAN_CONTROL_STOP =  CONTROL_STOP,
-	MODBUS_TO_CAN_CONTROL_READ = (CONTROL_USER << 0),
-	MODBUS_TO_CAN_CONTROL_WRITE = (CONTROL_USER << 1)
 };
 
 //! Перечисление возможных бит статуса.
@@ -706,181 +685,97 @@ enum _E_Modbus_To_Can_Status {
 	MODBUS_TO_CAN_STATUS_WRITE_DONE = (STATUS_USER << 1)
 };
 
-//! Тип слова управления.
-typedef uint32_t control_t;
-
 //! Тип слова статуса.
 typedef uint32_t status_t;
 
-//#define REG_ID_RMS_UA_OUT_VALUE 0x225004 /* Рассчитанное RMS. */
-//REG(REG_ID_RMS_UA_OUT_VALUE, &rms_Ua.out_value, REG_TYPE_IQ24, REG_FLAG_NONE, 0x000000) /* Рассчитанное RMS. */
+//modbus to can read
+#pragma pack(push, 1)
+struct {
+	uint8_t dev_id;
+	reg_id_t reg_id;
+	size_t reg_size;
+} modbus_to_can_read_request;
+#pragma pack(pop)
 
-err_t nmbs_to_can_read_id_size_data() {
-	//найдем регистр индетификатора
-	reg_t* id_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_REG_ID);
-	if(id_reg == NULL) {
-		return E_MODBUS_TO_CAN_NULL_POINTER;
-	}
+#pragma pack(push, 1)
+struct {
+	uint8_t dev_id;
+	reg_id_t reg_id;
+	iql_t reg_data;
+	status_t status;
+} modbus_to_can_read_response;
+#pragma pack(pop)
 
-	//прочитамем регистры id, size и data
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], id_reg, 3);
-	if (nmbs_err != NMBS_ERROR_NONE) {
-		return E_MODBUS_TO_CAN_NMBS_ERROR;
-	}
+//modbus to can write
+#pragma pack(push, 1)
+struct {
+	uint8_t dev_id;
+	reg_id_t reg_id;
+	iql_t reg_data;
+	size_t reg_size;
+} modbus_to_can_write_request;
+#pragma pack(pop)
 
-	return E_NO_ERROR;
-}
+#pragma pack(push, 1)
+struct {
+	uint8_t dev_id;
+	reg_id_t reg_id;
+	status_t status;
+} modbus_to_can_write_response;
+#pragma pack(pop)
 
-err_t nmbs_to_can_send_id_size_data() {
-	//найдем регистр id
-	reg_t* id_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_REG_ID);
-	if(id_reg == NULL) {
-		return E_MODBUS_TO_CAN_NULL_POINTER;
-	}
-	//отправим регистры id, size и data
-	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, &reg_list[0], id_reg, 3);
-	if (nmbs_err != NMBS_ERROR_NONE) {
-		return E_MODBUS_TO_CAN_NMBS_ERROR;
-	}
+err_t nmbs_to_can_reg_read(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
+	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
 
-	return E_NO_ERROR;
-}
+	nmbs_error error = NMBS_ERROR_NONE;
 
-err_t nmbs_to_can_send_command() {
-	//найдем регистр id
-	reg_t* control = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_CONTROL);
-	if(control == NULL) {
-		return E_MODBUS_TO_CAN_NULL_POINTER;
-	}
-	//отправим регистр control
-	nmbs_error nmbs_err = nmbs_write_regs(&nmbs, &reg_list[0], control, 1);
-	if (nmbs_err != NMBS_ERROR_NONE) {
-		return E_MODBUS_TO_CAN_NMBS_ERROR;
-	}
+	//заполним запрос
+	modbus_to_can_read_request.dev_id = dev_id;
+	modbus_to_can_read_request.reg_id = reg->id;
+	modbus_to_can_read_request.reg_size = reg_data_size(reg);
 
-	return E_NO_ERROR;
-}
+	//скопируем запрос
+	memcpy(nmbs_request_data, &modbus_to_can_read_request, sizeof(modbus_to_can_read_request));
 
-err_t nmbs_to_can_read_cmd(uint32_t id, uint8_t size) {
-	err_t err = E_NO_ERROR;
+	//отправим данные
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_CAN_READ, nmbs_request_data, sizeof(modbus_to_can_read_request));
 
-	//запишем id
-	modbus_reg_can_reg_id.reg_u32 =  id;
-	//запишем size
-	modbus_reg_can_reg_size.reg_u8[0] =  size;
-	//запишем data
-	modbus_reg_can_reg_data.reg_u32 =  0;
-	//запишем control
-	modbus_reg_can_control.reg_u32 = (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_READ);
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
-	err = nmbs_to_can_send_id_size_data();
+	//получим данные
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, sizeof(modbus_to_can_read_response));
 
-	if(err != E_NO_ERROR) return err;
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
-	return nmbs_to_can_send_command();
-}
+	//скопируем ответ
+	memcpy(&modbus_to_can_read_response, nmbs_response_data, sizeof(modbus_to_can_read_response));
 
-err_t nmbs_to_can_write_cmd(uint32_t id, uint8_t size, uint32_t data) {
-	err_t err = E_NO_ERROR;
+	if((modbus_to_can_read_response.status &
+			(MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE))
+			 == (MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE)) {
 
-	//запишем id
-	modbus_reg_can_reg_id.reg_u32 =  id;
-	//запишем size
-	modbus_reg_can_reg_size.reg_u8[0] =  size;
-	//запишем data
-	modbus_reg_can_reg_data.reg_u32 =  data;
-	//запишем control
-	modbus_reg_can_control.reg_u32 = (MODBUS_TO_CAN_CONTROL_ENABLE | MODBUS_TO_CAN_CONTROL_START | MODBUS_TO_CAN_CONTROL_WRITE);
-
-	err = nmbs_to_can_send_id_size_data();
-
-	if(err != E_NO_ERROR) return err;
-
-	return nmbs_to_can_send_command();
-}
-
-err_t nmbs_to_can_status_ready_read() {
-	//найдем регистр статуса
-	reg_t* status_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_STATUS);
-	if(status_reg == NULL) {
-		return E_MODBUS_TO_CAN_NULL_POINTER;
-	}
-
-	//прочитаем регистр статуса
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], status_reg, 1);
-	if(nmbs_err != NMBS_ERROR_NONE) {
-		return E_MODBUS_TO_CAN_NMBS_ERROR;
-	}
-
-	//прочитаем статус
-	uint32_t status = reg_value_u32(status_reg);
-
-	if(status & MODBUS_TO_CAN_STATUS_READY) {
-		if(status & MODBUS_TO_CAN_STATUS_RUN) {
-			return E_MODBUS_TO_CAN_IN_PROGRESS;
-		} else {
-			if((status
-					& (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE))
-					== (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_READ_DONE)) {
-				return E_MODBUS_TO_CAN_DATA_READY;
-			} else {
-				return E_MODBUS_TO_CAN_DATA_NOT_READY;
-			}
+		if((modbus_to_can_read_response.dev_id == dev_id) &&
+				(modbus_to_can_read_response.reg_id == reg->id)) {
+			reg_set_valuel(reg, modbus_to_can_read_response.reg_data);
+			return E_NO_ERROR;
 		}
-	} else {
-		return E_MODBUS_TO_CAN_MODULE_NOT_READY;
+
+		return E_CANCELED;
 	}
 
-	return E_NOT_IMPLEMENTED;
-}
-
-err_t nmbs_to_can_status_write_done() {
-	//найдем регистр статуса
-	reg_t* status_reg = regs_find(&reg_list[0], APP_REG_ID_MODBUS_REG_CAN_STATUS);
-	if(status_reg == NULL) {
-		return E_MODBUS_TO_CAN_NULL_POINTER;
-	}
-
-	//прочитаем регистр статуса
-	nmbs_error nmbs_err = nmbs_read_regs(&nmbs, &reg_list[0], status_reg, 1);
-	if(nmbs_err != NMBS_ERROR_NONE) {
-		return E_MODBUS_TO_CAN_NMBS_ERROR;
-	}
-
-	//прочитаем статус
-	uint32_t status = reg_value_u32(status_reg);
-
-	if(status & MODBUS_TO_CAN_STATUS_READY) {
-		if(status & MODBUS_TO_CAN_STATUS_RUN) {
-			return E_MODBUS_TO_CAN_IN_PROGRESS;
-		} else {
-			if((status
-					& (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE))
-					== (MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE)) {
-				return E_MODBUS_TO_CAN_DATA_WRITTEN;
-			} else {
-				return E_MODBUS_TO_CAN_DATA_NOT_WRITTEN;
-			}
-		}
-	} else {
-		return E_MODBUS_TO_CAN_MODULE_NOT_READY;
-	}
-
-	return E_NOT_IMPLEMENTED;
+	return E_IN_PROGRESS;
 }
 
 void nmbs_to_can_read() {
-	err_t err = nmbs_to_can_status_ready_read();
-	switch(err) {
-	case E_MODBUS_TO_CAN_DATA_READY:
-		nmbs_to_can_read_id_size_data();
-		str_0_count = snprintf(str_0, 17, "%lu" , modbus_reg_can_reg_data.reg_u32);
-		//no break
-	case E_MODBUS_TO_CAN_DATA_NOT_READY:
-		nmbs_to_can_read_cmd(((1 << 24) | 0x225004), 4);
-		break;
-	default:
-		break;
+	reg_t* reg = regs_find(&reg_list[1], MC_REG_ID_MEAN_IARM_OUT_VALUE);
+
+	err_t err = nmbs_to_can_reg_read(&nmbs, 1, reg);
+
+	if(err == E_NO_ERROR) {
+		str_0_count = snprintf(str_0, 17, "OK: %i", reg_valuel(reg));
+	} else {
+		str_0_count = snprintf(str_0, 17, "ERR: %u" , err);
+		str_1_count = snprintf(str_1, 17, "STATUS: %u" , modbus_to_can_read_response.status);
 	}
 }
 
