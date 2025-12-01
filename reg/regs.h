@@ -12,6 +12,7 @@
 typedef struct _S_Reg_List {
 	const reg_t* regs;
 	size_t size;
+	uint8_t id;
 } reg_list_t;
 
 

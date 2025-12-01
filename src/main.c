@@ -724,7 +724,7 @@ struct {
 } modbus_to_can_write_response;
 #pragma pack(pop)
 
-err_t nmbs_to_can_reg_read(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
+err_t nmbs_to_can_read_reg(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
 
 	nmbs_error error = NMBS_ERROR_NONE;
@@ -766,7 +766,7 @@ err_t nmbs_to_can_reg_read(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	return E_IN_PROGRESS;
 }
 
-err_t nmbs_to_can_reg_write(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
+err_t nmbs_to_can_write_reg(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
 
 	nmbs_error error = NMBS_ERROR_NONE;
@@ -808,16 +808,25 @@ err_t nmbs_to_can_reg_write(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	return E_IN_PROGRESS;
 }
 
-void nmbs_to_can_read() {
-	reg_t* reg = regs_find(&reg_list[1], MC_REG_ID_MEAN_IARM_OUT_VALUE);
+err_t nmbs_read_reg(const reg_list_t* list, reg_t* reg) {
+	switch(list->id) {
+	case MC_REGS_ID:
+		return nmbs_to_can_read_reg(&nmbs, 1, reg);
+	case APP_REGS_ID:
+		return nmbs_read_regs(&nmbs, list, reg, 1);
+	default:
+		return E_NOT_IMPLEMENTED;
+	}
+}
 
-	err_t err = nmbs_to_can_reg_read(&nmbs, 1, reg);
-
-	if(err == E_NO_ERROR) {
-		str_0_count = snprintf(str_0, 17, "OK: %i", reg_valuel(reg));
-	} else {
-		str_0_count = snprintf(str_0, 17, "ERR: %u" , err);
-		str_1_count = snprintf(str_1, 17, "STATUS: %u" , modbus_to_can_read_response.status);
+err_t nmbs_write_reg(const reg_list_t* list, reg_t* reg) {
+	switch(list->id) {
+	case MC_REGS_ID:
+		return nmbs_to_can_write_reg(&nmbs, 1, reg);
+	case APP_REGS_ID:
+		return nmbs_write_regs(&nmbs, list, reg, 1);
+	default:
+		return E_NOT_IMPLEMENTED;
 	}
 }
 
@@ -861,9 +870,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			//menu_panel_process(&panel_menu_0);
-
-			nmbs_to_can_read(); //тест
+			menu_panel_process(&panel_menu_0);
 
 			screen_fill();
 

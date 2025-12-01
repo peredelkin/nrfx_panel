@@ -4,8 +4,8 @@
 #include "reg_list.h"
 
 const reg_list_t reg_list[REG_LIST_SIZE] = {
-		{app_regs, APP_REGS_COUNT},
-		{mc_regs, MC_REGS_COUNT}
+		{app_regs, APP_REGS_COUNT, APP_REGS_ID},
+		{mc_regs, MC_REGS_COUNT , MC_REGS_ID}
 };
 
 

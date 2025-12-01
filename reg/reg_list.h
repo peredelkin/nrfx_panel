@@ -39,6 +39,8 @@
 #include "mc/mc_reg_list_data.h"
 #define APP_REGS_COUNT REGS_COUNT_VALUE(APP_REG_ARRAY_NAME)
 #define MC_REGS_COUNT REGS_COUNT_VALUE(MC_REG_ARRAY_NAME)
+#define APP_REGS_ID 2
+#define MC_REGS_ID 1
 
 
 #endif /* REG_LIST_H */
