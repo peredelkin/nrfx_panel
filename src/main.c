@@ -766,6 +766,48 @@ err_t nmbs_to_can_reg_read(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	return E_IN_PROGRESS;
 }
 
+err_t nmbs_to_can_reg_write(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
+	if((nmbs == NULL) || (reg == NULL)) return E_MODBUS_REG_NULL_POINTER;
+
+	nmbs_error error = NMBS_ERROR_NONE;
+
+	//заполним запрос
+	modbus_to_can_write_request.dev_id = dev_id;
+	modbus_to_can_write_request.reg_id = reg->id;
+	modbus_to_can_write_request.reg_data = reg_data(reg);
+	modbus_to_can_write_request.reg_size = reg_data_size(reg);
+
+	//скопируем запрос
+	memcpy(nmbs_request_data, &modbus_to_can_write_request, sizeof(modbus_to_can_write_request));
+
+	//отправим данные
+	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_CAN_WRITE, nmbs_request_data, sizeof(modbus_to_can_write_request));
+
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
+
+	//получим данные
+	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, sizeof(modbus_to_can_write_response));
+
+	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
+
+	//скопируем ответ
+	memcpy(&modbus_to_can_write_response, nmbs_response_data, sizeof(modbus_to_can_write_response));
+
+	if((modbus_to_can_write_response.status &
+			(MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE))
+			 == (MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE)) {
+
+		if((modbus_to_can_write_response.dev_id == dev_id) &&
+				(modbus_to_can_write_response.reg_id == reg->id)) {
+			return E_NO_ERROR;
+		}
+
+		return E_CANCELED;
+	}
+
+	return E_IN_PROGRESS;
+}
+
 void nmbs_to_can_read() {
 	reg_t* reg = regs_find(&reg_list[1], MC_REG_ID_MEAN_IARM_OUT_VALUE);
 
