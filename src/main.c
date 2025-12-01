@@ -810,23 +810,19 @@ err_t nmbs_to_can_write_reg(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 
 err_t nmbs_read_reg(const reg_list_t* list, reg_t* reg) {
 	switch(list->id) {
-	case MC_REGS_ID:
-		return nmbs_to_can_read_reg(&nmbs, 1, reg);
 	case APP_REGS_ID:
 		return nmbs_read_regs(&nmbs, list, reg, 1);
 	default:
-		return E_NOT_IMPLEMENTED;
+		return nmbs_to_can_read_reg(&nmbs, list->id, reg);
 	}
 }
 
 err_t nmbs_write_reg(const reg_list_t* list, reg_t* reg) {
 	switch(list->id) {
-	case MC_REGS_ID:
-		return nmbs_to_can_write_reg(&nmbs, 1, reg);
 	case APP_REGS_ID:
 		return nmbs_write_regs(&nmbs, list, reg, 1);
 	default:
-		return E_NOT_IMPLEMENTED;
+		return nmbs_to_can_write_reg(&nmbs, list->id, reg);
 	}
 }
 
