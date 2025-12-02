@@ -456,54 +456,59 @@ void edit_menu_item_value(menu_item_t* item)
     }
 }
 
-void paint_menu_item_value(menu_item_t* item)
-{
-	menu_value_t* value = menu_item_value(item);
+void paint_menu_item_value(menu_item_t *item) {
+	menu_value_t *value = menu_item_value(item);
 
-    if(value == NULL) return;
+	if (value == NULL) return;
 
-    if(item->id >= REG_LIST_SIZE) return;
+	if (item->id >= REG_LIST_SIZE) return;
 
-     const reg_list_t* list = &reg_list[item->id];
+	const reg_list_t *list = &reg_list[item->id];
 
-     if(list == NULL) return;
+	if (list == NULL) return;
 
-     reg_t* reg_ptr = regs_find(list,item->subid);
+	reg_t *reg_ptr = regs_find(list, item->subid);
 
-     if(reg_ptr == NULL) return;
+	if (reg_ptr == NULL) return;
 
-     reg_type_t type = reg_type(reg_ptr);
+	reg_type_t type = reg_type(reg_ptr);
 
-    switch(menu_value_type(value)){
-        case MENU_VALUE_TYPE_STRING:
-        	str_1_count = snprintf(str_1, 17, "%s", menu_value_string(value));
-            break;
-        case MENU_VALUE_TYPE_INT:
-        	menu_reg_value_int_read(list, reg_ptr, value);
-        	switch(type) {
-        	case REG_TYPE_IQ24:
-        		str_1_count = snprintf(str_1, 17, "%.2f%%", ((float)menu_value_int(value)/16777216.0f)*100.0f);
-        		break;
-        	default:
-        		str_1_count = snprintf(str_1, 17, "%d", (int)menu_value_int(value));
-        		break;
-        	}
-            break;
-        case MENU_VALUE_TYPE_BOOL:
-        	str_1_count = snprintf(str_1, 17, "%s", menu_value_bool(value) ? "true" : "false");
-            break;
-        case MENU_VALUE_TYPE_FIXED:
-        	str_1_count = snprintf(str_1, 17, "0x%x", (int)menu_value_int(value));
-            break;
-        case MENU_VALUE_TYPE_ENUM:
-        	menu_reg_value_enum_read(list, reg_ptr, value);
-            value = menu_value_enum_current_value(value);
-            paint_menu_item_value(item);
-            break;
-        default:
-        	str_1_count = snprintf(str_1, 17, "-");
-            break;
-    }
+	bool repeat;
+
+	do {
+		repeat = false;
+		switch (menu_value_type(value)) {
+		case MENU_VALUE_TYPE_STRING:
+			str_1_count = snprintf(str_1, 17, "%s", menu_value_string(value));
+			break;
+		case MENU_VALUE_TYPE_INT:
+			menu_reg_value_int_read(list, reg_ptr, value);
+			switch (type) {
+			case REG_TYPE_IQ24:
+				str_1_count = snprintf(str_1, 17, "%.2f%%",
+						((float) menu_value_int(value) / 16777216.0f) * 100.0f);
+				break;
+			default:
+				str_1_count = snprintf(str_1, 17, "%d", (int) menu_value_int(value));
+				break;
+			}
+			break;
+		case MENU_VALUE_TYPE_BOOL:
+			str_1_count = snprintf(str_1, 17, "%s", menu_value_bool(value) ? "true" : "false");
+			break;
+		case MENU_VALUE_TYPE_FIXED:
+			str_1_count = snprintf(str_1, 17, "0x%x", (int) menu_value_int(value));
+			break;
+		case MENU_VALUE_TYPE_ENUM:
+			menu_reg_value_enum_read(list, reg_ptr, value);
+			value = menu_value_enum_current_value(value);
+			repeat = true;
+			break;
+		default:
+			str_1_count = snprintf(str_1, 17, "-");
+			break;
+		}
+	} while (repeat);
 }
 
 void screen_fill() {
