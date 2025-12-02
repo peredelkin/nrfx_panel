@@ -268,7 +268,8 @@ err_t nmbs_to_can_read_reg(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 		}
 
 		//чтение закончено
-		if(!(modbus_to_can_read_response.control & MODBUS_TO_CAN_CONTROL_ENABLE) && (modbus_to_can_read_response.status & MODBUS_TO_CAN_STATUS_READ_DONE)) {
+		if(!(modbus_to_can_read_response.control & MODBUS_TO_CAN_CONTROL_ENABLE) &&
+				(modbus_to_can_read_response.status & MODBUS_TO_CAN_STATUS_READ_DONE)) {
 			//чтение законечно без ошибок
 			if(modbus_to_can_read_response.status & MODBUS_TO_CAN_STATUS_VALID) {
 				//id и reg_id совпадают
@@ -303,32 +304,45 @@ err_t nmbs_to_can_write_reg(nmbs_t* nmbs, uint8_t dev_id, reg_t* reg) {
 	//скопируем запрос
 	memcpy(nmbs_request_data, &modbus_to_can_write_request, sizeof(modbus_to_can_write_request));
 
-	//отправим данные
-	error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_CAN_WRITE, nmbs_request_data, sizeof(modbus_to_can_write_request));
+	do {
+		//отправим данные
+		error = nmbs_send_raw_pdu(nmbs, MODBUS_RTU_CUSTOM_FUNC_CAN_WRITE, nmbs_request_data, sizeof(modbus_to_can_write_request));
 
-	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
+		if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
-	//получим данные
-	error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, sizeof(modbus_to_can_write_response));
+		//получим данные
+		error = nmbs_receive_raw_pdu_response(nmbs, nmbs_response_data, sizeof(modbus_to_can_write_response));
 
-	if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
+		if(error != NMBS_ERROR_NONE) return E_MODBUS_REG_NMBS_ERROR;
 
-	//скопируем ответ
-	memcpy(&modbus_to_can_write_response, nmbs_response_data, sizeof(modbus_to_can_write_response));
+		//скопируем ответ
+		memcpy(&modbus_to_can_write_response, nmbs_response_data, sizeof(modbus_to_can_write_response));
 
-	if((modbus_to_can_write_response.status &
-			(MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE))
-			 == (MODBUS_TO_CAN_STATUS_READY | MODBUS_TO_CAN_STATUS_VALID | MODBUS_TO_CAN_STATUS_WRITE_DONE)) {
-
-		if((modbus_to_can_write_response.dev_id == dev_id) &&
-				(modbus_to_can_write_response.reg_id == reg->id)) {
-			return E_NO_ERROR;
+		//модуль не готов
+		if(!(modbus_to_can_write_response.status & MODBUS_TO_CAN_STATUS_READY)) {
+			return E_CANCELED;
 		}
 
-		return E_CANCELED;
-	}
+		//запись закончена
+		if((modbus_to_can_write_response.control & MODBUS_TO_CAN_CONTROL_ENABLE) &&
+				(modbus_to_can_write_response.status & MODBUS_TO_CAN_STATUS_WRITE_DONE)) {
+			//запись закончена без ошибок
+			if(modbus_to_can_write_response.status & MODBUS_TO_CAN_STATUS_VALID) {
+				//id и reg_id совпадают
+				if((modbus_to_can_write_response.dev_id == dev_id) &&
+						(modbus_to_can_write_response.reg_id == reg->id)) {
+					return E_NO_ERROR;
+				}
+			}
 
-	return E_IN_PROGRESS;
+			return E_CANCELED;
+		}
+
+		delay_ms(10);
+
+	} while (modbus_to_can_write_response.control & MODBUS_TO_CAN_CONTROL_ENABLE);
+
+	return E_STATE;
 }
 
 err_t nmbs_read_reg(nmbs_t* nmbs, const reg_list_t* list, reg_t* reg) {

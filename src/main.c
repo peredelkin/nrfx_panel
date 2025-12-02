@@ -406,18 +406,37 @@ void menu_reg_value_enum_change(const reg_list_t* list, reg_t* reg, menu_value_t
 	}
 }
 
+//TODO: нужны min/max
+void menu_reg_value_int_read(const reg_list_t* list, reg_t* reg, menu_value_t* value) {
+	if(nmbs_read_reg(&nmbs, list, reg) == NMBS_ERROR_NONE) {
+
+		int tmp_val = reg_valuel(reg);
+
+		menu_value_set_int(value, tmp_val);
+	}
+}
+
 void edit_menu_item_value(menu_item_t* item)
 {
 	menu_value_t* value = menu_item_value(item);
 
     if(value == NULL) return;
 
-    reg_t* reg_ptr = regs_find(&reg_list[0],item->id);
+    if(item->id >= REG_LIST_SIZE) return;
+
+    const reg_list_t* list = &reg_list[item->id];
+
+    if(list == NULL) return;
+
+    reg_t* reg_ptr = regs_find(list,item->subid);
+
+    if(reg_ptr == NULL) return;
 
     switch(menu_value_type(value)){
         case MENU_VALUE_TYPE_STRING:
             break;
         case MENU_VALUE_TYPE_INT:
+        	menu_reg_value_int_read(list, reg_ptr, value);
             break;
         case MENU_VALUE_TYPE_BOOL:
             menu_value_set_bool(value, !menu_value_bool(value));
@@ -425,16 +444,14 @@ void edit_menu_item_value(menu_item_t* item)
         case MENU_VALUE_TYPE_FIXED:
             break;
         case MENU_VALUE_TYPE_ENUM:
-			if(reg_ptr != NULL) {
-				menu_reg_value_enum_read(&reg_list[0], reg_ptr, value);
+			menu_reg_value_enum_read(list, reg_ptr, value);
 
-	            if(pca_keys.rise.bit.Pl) {
-	            	menu_reg_value_enum_change(&reg_list[0], reg_ptr, value, 1);
-	            }
+			if(pca_keys.rise.bit.Pl) {
+				menu_reg_value_enum_change(list, reg_ptr, value, 1);
+			}
 
-	            if(pca_keys.rise.bit.Mn) {
-	            	menu_reg_value_enum_change(&reg_list[0], reg_ptr, value, -1);
-	            }
+			if(pca_keys.rise.bit.Mn) {
+				menu_reg_value_enum_change(list, reg_ptr, value, -1);
 			}
             break;
         default:
@@ -568,9 +585,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			nmbs_to_can_read_test(); //test!
-
-			//menu_panel_process(&panel_menu_0);
+			menu_panel_process(&panel_menu_0);
 
 			screen_fill();
 
