@@ -696,10 +696,10 @@ REG(MC_REG_ID_MEAN_IRSTART_OUT_VALUE,  &mc_regs_data_union,  REG_TYPE_IQ24,  REG
 REG(MC_REG_ID_MEAN_RMS_ICELL_COUNT,  &mc_regs_data_union,  REG_TYPE_U8,  REG_FLAG_READONLY,  0x000000)  /*  Number  of  sub  entries  count  */
 REG(MC_REG_ID_MEAN_RMS_ICELL_CONTROL,  &mc_regs_data_union,  REG_TYPE_U32,  REG_FLAG_NONE,  0x000000)  /*  Слово  управления.  */
 REG(MC_REG_ID_MEAN_RMS_ICELL_STATUS,  &mc_regs_data_union,  REG_TYPE_U32,  REG_FLAG_NONE,  0x000000)  /*  Слово  состояния.  */
-REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE0,  &mc_regs_data_union,  REG_TYPE_I32,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
-REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE1,  &mc_regs_data_union,  REG_TYPE_I32,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
-REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE2,  &mc_regs_data_union,  REG_TYPE_I32,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
-REG(MC_REG_ID_MEAN_RMS_ICELL_OUT_VALUE,  &mc_regs_data_union,  REG_TYPE_I32,  REG_FLAG_NONE,  0x000000)  /*  Среднее  значение.  */
+REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE0,  &mc_regs_data_union,  REG_TYPE_IQ24,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
+REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE1,  &mc_regs_data_union,  REG_TYPE_IQ24,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
+REG(MC_REG_ID_MEAN_RMS_ICELL_IN_VALUE2,  &mc_regs_data_union,  REG_TYPE_IQ24,  REG_FLAG_NONE,  0x000000)  /*  Усредняемые  значения.  */
+REG(MC_REG_ID_MEAN_RMS_ICELL_OUT_VALUE,  &mc_regs_data_union,  REG_TYPE_IQ24,  REG_FLAG_NONE,  0x000000)  /*  Среднее  значение.  */
 REG(MC_REG_ID_SUM_S_COUNT,  &mc_regs_data_union,  REG_TYPE_U8,  REG_FLAG_READONLY,  0x000000)  /*  Number  of  sub  entries  count  */
 REG(MC_REG_ID_SUM_S_CONTROL,  &mc_regs_data_union,  REG_TYPE_U32,  REG_FLAG_NONE,  0x000000)  /*  Слово  управления.  */
 REG(MC_REG_ID_SUM_S_STATUS,  &mc_regs_data_union,  REG_TYPE_U32,  REG_FLAG_NONE,  0x000000)  /*  Слово  состояния.  */
