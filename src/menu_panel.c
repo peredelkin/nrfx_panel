@@ -25,7 +25,8 @@ const char menu_text_do[] = "Digital Outputs";
 
 //1
 const char menu_text_power[] = "Power";
-const char menu_text_rms[] = "RMS";
+const char menu_text_cell[] = "Cell";
+const char menu_text_mains[] = "Mains";
 const char menu_text_sel[] = "Select";
 const char menu_text_inv[] = "Inversion";
 const char menu_text_flt[] = "Filter";
@@ -34,19 +35,20 @@ const char menu_text_flt[] = "Filter";
 const char menu_text_full[] = "Full";
 const char menu_text_active[] = "Active";
 const char menu_text_reactive[] = "Reactive";
-const char menu_text_cell[] = "Cell";
-const char menu_text_mains[] = "Mains";
+const char menu_text_rms[] = "RMS";
 const char menu_text_ton[] = "T On";
 const char menu_text_toff[] = "T Off";
 const char menu_text_type[] = "Type";
 
-//3
-const char menu_text_current_abc[] = "Current ABC";
+const char menu_text_current_avg[] = "Current Average";
+const char menu_text_current_out[] = "Current Out";
 const char menu_text_current_a[] = "Current A";
-const char menu_text_voltage_a[] = "Voltage A";
 const char menu_text_current_b[] = "Current B";
-const char menu_text_voltage_b[] = "Voltage B";
 const char menu_text_current_c[] = "Current C";
+const char menu_text_voltage_avg[] = "Current Average";
+const char menu_text_voltage_out[] = "Voltage Out";
+const char menu_text_voltage_a[] = "Voltage A";
+const char menu_text_voltage_b[] = "Voltage B";
 const char menu_text_voltage_c[] = "Voltage C";
 
 //digital in
@@ -136,26 +138,29 @@ menu_t panel_menu_0;
 
 MENU_DESCRS(panel_menu_descrs) {
 MENU_DESCR(0, 0, 0, menu_text_meas, 0, 0, 0, 0, 0),
-MENU_DESCR(1, 0, 0, menu_text_power, 0, 0, 0, 0, 0),
-MENU_DESCR(2, 1, MC_REG_ID_POWER_FACTOR_IN_S, menu_text_full, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(2, 1, MC_REG_ID_POWER_FACTOR_IN_P, menu_text_active, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(2, 1, MC_REG_ID_POWER_FACTOR_IN_Q, menu_text_reactive, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(1, 0, 0, menu_text_rms, 0, 0, 0, 0, 0),
-MENU_DESCR(2, 1, 0, menu_text_cell, 0, 0, 0, 0, 0),
-MENU_DESCR(3, 1, MC_REG_ID_MEAN_RMS_ICELL_OUT_VALUE, menu_text_current_abc, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IA_OUT_VALUE, menu_text_current_a, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UA_OUT_VALUE, menu_text_voltage_a, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(2, 1, 0, menu_text_mains, 0, 0, 0, 0, 0),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_IA_OUT_VALUE, menu_text_current_a, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_UA_OUT_VALUE, menu_text_voltage_a, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
-MENU_DESCR(3, 1, MC_REG_ID_RMS_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
+ MENU_DESCR(1, 1, 0, menu_text_cell, 0, 0, 0, 0, 0),
+  MENU_DESCR(2, 0, 0, menu_text_power, 0, 0, 0, 0, 0),
+   MENU_DESCR(3, 1, MC_REG_ID_POWER_FACTOR_IN_S, menu_text_full, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_POWER_FACTOR_IN_P, menu_text_active, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_POWER_FACTOR_IN_Q, menu_text_reactive, 0, 0, 0, 0, &menu_val_int),
+  MENU_DESCR(2, 0, 0, menu_text_rms, 0, 0, 0, 0, 0),
+   MENU_DESCR(3, 1, MC_REG_ID_MEAN_RMS_ICELL_OUT_VALUE, menu_text_current_avg, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IA_OUT_VALUE, menu_text_current_a, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UA_OUT_VALUE, menu_text_voltage_a, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
+ MENU_DESCR(1, 1, 0, menu_text_mains, 0, 0, 0, 0, 0),
+  MENU_DESCR(2, 1, MC_REG_ID_MEAN_IARM_OUT_VALUE, menu_text_current_out, 0, 0, 0, 0, &menu_val_int),
+  MENU_DESCR(2, 1, MC_REG_ID_MEAN_UARM_OUT_VALUE, menu_text_voltage_out, 0, 0, 0, 0, &menu_val_int),
+  MENU_DESCR(2, 0, 0, menu_text_rms, 0, 0, 0, 0, 0),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_IA_OUT_VALUE, menu_text_current_a, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_UA_OUT_VALUE, menu_text_voltage_a, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
+   MENU_DESCR(3, 1, MC_REG_ID_RMS_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
 MENU_DESCR(0, 0, 0, menu_text_di, 0, 0, 0, 0, 0),
 MENU_DESCR(1, 0, 0, menu_text_di_out_0, 0, 0, 0, 0, 0),
 MENU_DESCR(2, 0, APP_REG_ID_DIGITAL_IN_SELECT0, menu_text_sel, 0, 0, 0, 0, &menu_val_digital_in_select),
