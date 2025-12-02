@@ -35,6 +35,7 @@ const char menu_text_full[] = "Full";
 const char menu_text_active[] = "Active";
 const char menu_text_reactive[] = "Reactive";
 const char menu_text_cell[] = "Cell";
+const char menu_text_mains[] = "Mains";
 const char menu_text_ton[] = "T On";
 const char menu_text_toff[] = "T Off";
 const char menu_text_type[] = "Type";
@@ -148,6 +149,13 @@ MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 
 MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
 MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
 MENU_DESCR(3, 1, MC_REG_ID_RMS_CELL_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(2, 1, 0, menu_text_mains, 0, 0, 0, 0, 0),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_IA_OUT_VALUE, menu_text_current_a, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_UA_OUT_VALUE, menu_text_voltage_a, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_IB_OUT_VALUE, menu_text_current_b, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_UB_OUT_VALUE, menu_text_voltage_b, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_IC_OUT_VALUE, menu_text_current_c, 0, 0, 0, 0, &menu_val_int),
+MENU_DESCR(3, 1, MC_REG_ID_RMS_UC_OUT_VALUE, menu_text_voltage_c, 0, 0, 0, 0, &menu_val_int),
 MENU_DESCR(0, 0, 0, menu_text_di, 0, 0, 0, 0, 0),
 MENU_DESCR(1, 0, 0, menu_text_di_out_0, 0, 0, 0, 0, 0),
 MENU_DESCR(2, 0, APP_REG_ID_DIGITAL_IN_SELECT0, menu_text_sel, 0, 0, 0, 0, &menu_val_digital_in_select),
