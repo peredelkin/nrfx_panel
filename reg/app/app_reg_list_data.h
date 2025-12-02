@@ -3,13 +3,6 @@
 
 static regs_data_union_t app_regs_data_union;
 
-extern regs_data_union_t modbus_reg_can_count;
-extern regs_data_union_t modbus_reg_can_control;
-extern regs_data_union_t modbus_reg_can_status;
-extern regs_data_union_t modbus_reg_can_reg_id;
-extern regs_data_union_t modbus_reg_can_reg_size;
-extern regs_data_union_t modbus_reg_can_reg_data;
-
 REGS_BEGIN(APP_REG_ARRAY_NAME)
 
 REG(APP_REG_ID_DEVICE_TYPE_VALUE, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
@@ -393,12 +386,12 @@ REG(APP_REG_ID_PANEL_LED_CONTROL, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_N
 REG(APP_REG_ID_PANEL_LED_STATUS, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
 REG(APP_REG_ID_PANEL_LED_OUT_DATA, &app_regs_data_union, REG_TYPE_U16, REG_FLAG_NONE, 0x000000) /*  */
 REG(APP_REG_ID_MODBUS_REG_CAN_COUNT, &app_regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
-REG(APP_REG_ID_MODBUS_REG_CAN_COUNT, &modbus_reg_can_count, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
-REG(APP_REG_ID_MODBUS_REG_CAN_CONTROL, &modbus_reg_can_control, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
-REG(APP_REG_ID_MODBUS_REG_CAN_STATUS, &modbus_reg_can_status, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
-REG(APP_REG_ID_MODBUS_REG_CAN_REG_ID, &modbus_reg_can_reg_id, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
-REG(APP_REG_ID_MODBUS_REG_CAN_REG_SIZE, &modbus_reg_can_reg_size, REG_TYPE_U8, REG_FLAG_NONE, 0x000000) /*  */
-REG(APP_REG_ID_MODBUS_REG_CAN_REG_DATA, &modbus_reg_can_reg_data, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(APP_REG_ID_MODBUS_REG_CAN_COUNT, &app_regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
+REG(APP_REG_ID_MODBUS_REG_CAN_CONTROL, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
+REG(APP_REG_ID_MODBUS_REG_CAN_STATUS, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
+REG(APP_REG_ID_MODBUS_REG_CAN_REG_ID, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
+REG(APP_REG_ID_MODBUS_REG_CAN_REG_SIZE, &app_regs_data_union, REG_TYPE_U8, REG_FLAG_NONE, 0x000000) /*  */
+REG(APP_REG_ID_MODBUS_REG_CAN_REG_DATA, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /*  */
 REG(APP_REG_ID_CAN_TIM_COUNT, &app_regs_data_union, REG_TYPE_U8, REG_FLAG_READONLY, 0x000000) /* Number of sub entries count */
 REG(APP_REG_ID_CAN_TIM_CONTROL, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово управления. */
 REG(APP_REG_ID_CAN_TIM_STATUS, &app_regs_data_union, REG_TYPE_U32, REG_FLAG_NONE, 0x000000) /* Слово состояния. */
