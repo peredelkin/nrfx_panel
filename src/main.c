@@ -436,16 +436,13 @@ void edit_menu_item_value(menu_item_t* item)
         case MENU_VALUE_TYPE_STRING:
             break;
         case MENU_VALUE_TYPE_INT:
-        	menu_reg_value_int_read(list, reg_ptr, value);
             break;
         case MENU_VALUE_TYPE_BOOL:
-            menu_value_set_bool(value, !menu_value_bool(value));
+            //menu_value_set_bool(value, !menu_value_bool(value));
             break;
         case MENU_VALUE_TYPE_FIXED:
             break;
         case MENU_VALUE_TYPE_ENUM:
-			menu_reg_value_enum_read(list, reg_ptr, value);
-
 			if(pca_keys.rise.bit.Pl) {
 				menu_reg_value_enum_change(list, reg_ptr, value, 1);
 			}
@@ -459,16 +456,38 @@ void edit_menu_item_value(menu_item_t* item)
     }
 }
 
-void paint_menu_item_value(menu_value_t* value)
+void paint_menu_item_value(menu_item_t* item)
 {
+	menu_value_t* value = menu_item_value(item);
+
     if(value == NULL) return;
+
+    if(item->id >= REG_LIST_SIZE) return;
+
+     const reg_list_t* list = &reg_list[item->id];
+
+     if(list == NULL) return;
+
+     reg_t* reg_ptr = regs_find(list,item->subid);
+
+     if(reg_ptr == NULL) return;
+
+     reg_type_t type = reg_type(reg_ptr);
 
     switch(menu_value_type(value)){
         case MENU_VALUE_TYPE_STRING:
         	str_1_count = snprintf(str_1, 17, "%s", menu_value_string(value));
             break;
         case MENU_VALUE_TYPE_INT:
-        	str_1_count = snprintf(str_1, 17, "%d", (int)menu_value_int(value));
+        	menu_reg_value_int_read(list, reg_ptr, value);
+        	switch(type) {
+        	case REG_TYPE_IQ24:
+        		str_1_count = snprintf(str_1, 17, "%.2f%%", ((float)menu_value_int(value)/16777216.0f)*100.0f);
+        		break;
+        	default:
+        		str_1_count = snprintf(str_1, 17, "%d", (int)menu_value_int(value));
+        		break;
+        	}
             break;
         case MENU_VALUE_TYPE_BOOL:
         	str_1_count = snprintf(str_1, 17, "%s", menu_value_bool(value) ? "true" : "false");
@@ -477,8 +496,9 @@ void paint_menu_item_value(menu_value_t* value)
         	str_1_count = snprintf(str_1, 17, "0x%x", (int)menu_value_int(value));
             break;
         case MENU_VALUE_TYPE_ENUM:
+        	menu_reg_value_enum_read(list, reg_ptr, value);
             value = menu_value_enum_current_value(value);
-            paint_menu_item_value(value);
+            paint_menu_item_value(item);
             break;
         default:
         	str_1_count = snprintf(str_1, 17, "-");
@@ -505,8 +525,8 @@ void menu_panel_paint_item(menu_item_t* item) {
 		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
 	} else if (menu_item_has_value(item)) {
 		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item));
+		paint_menu_item_value(item);
 		edit_menu_item_value(item);
-		paint_menu_item_value(menu_item_value(item));
 	} else {
 		str_0_count = snprintf(str_0, 17, "%s", menu_item_text(item->parent));
 		str_1_count = snprintf(str_1, 17, "%s", menu_item_text(item));
